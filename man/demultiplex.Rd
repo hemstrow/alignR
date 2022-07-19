@@ -4,15 +4,13 @@
 \alias{demultiplex}
 \title{Split multiplexed reads with sample barcodes.}
 \usage{
-demultiplex(
-  R1_files,
-  R2_files,
-  barcodes,
-  outfile_prefix = "alignR_",
-  sample_names = NULL
-)
+demultiplex(R1, R2, barcodes, outfile_prefix = "alignR_", sample_names = NULL)
 }
 \arguments{
+\item{R1}{character. File name for R1 (read one) file.}
+
+\item{R2}{character. File name for R2 (read one) file.}
+
 \item{barcodes}{character. Vector of barcodes to search for in read files.}
 
 \item{outfile_prefix}{character. prefix to be appeneded to each resulting
@@ -21,10 +19,6 @@ demultiplex(
 \item{sample_names}{character. Vector of names for output files corresponding
 in order to the provided barcodes. Prefix and barcodes will in names
 will be replaced with these names.}
-
-\item{R1}{character. File name for R1 (read one) file.}
-
-\item{R2}{character. File name for R2 (read one) file.}
 }
 \description{
 Splits paired-end sequencing .fastq files containing reads from multiple

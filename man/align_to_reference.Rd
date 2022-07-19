@@ -2,10 +2,38 @@
 % Please edit documentation in R/align.R
 \name{align_to_reference}
 \alias{align_to_reference}
-\title{Filter and align paired-end reads to a reference genome.}
+\title{Filter and align single or paired-end reads to a reference genome.}
 \usage{
-align_to_reference(RA_fastqs, RB_fastqs, reference, par = 1)
+align_to_reference(RA_fastqs, RB_fastqs = NULL, reference, par = 1)
+}
+\arguments{
+\item{RA_fastqs}{character. Vector of filepaths for the RA (read one) files.}
+
+\item{RB_fastqs}{character or NULL, default NULL. Vector of filepaths for the
+RB (read one) files.}
+
+\item{reference}{character. Filepath for the reference genome to use for the
+alignment.}
+
+\item{par}{numeric, default 1. Number of cores to use for the alignments.}
 }
 \description{
-Filter and align paired-end reads to a reference genome.
+Aligns split, single- or paired-end reads to a reference genome using the bwa mem
+algorithm, them filters the resulting alignments using a few different
+approaches via samtools.
+}
+\details{
+Paired-end reads are filtered following alignment by first removing PCR
+duplicates using `samtools fixmate` and `samtools markdup`, then poorly
+mapped reads using `samtools view` with `-q 5`, and then improperly paired
+reads using `samtools view` with  `-f 0x2`. The full alignment script can be
+accessed using `system.file("shell", "run_align.sh", "alignR")`.
+
+Single-end reads are not filtered following alignment, although filtering can
+(and usually should) be done while calling genotypes or doing other 
+down-stream analyses.cThe full alignment script can be
+accessed using `system.file("shell", "run_align_single.sh", "alignR")`.
+}
+\author{
+William Hemstrom
 }

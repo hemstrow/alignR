@@ -57,7 +57,7 @@ plate_split <- function(R1, R2, R3, barcodes, outfile_prefix = ""){
 #'
 #' @author William Hemstrom
 #' @author Michael Miller
-demultiplex <- function(R1_files, R2_files, barcodes, outfile_prefix = "alignR_", sample_names = NULL){
+demultiplex <- function(R1, R2, barcodes, outfile_prefix = "alignR_", sample_names = NULL){
   #============sanity checks========
   msg <- character()
 
@@ -79,8 +79,8 @@ demultiplex <- function(R1_files, R2_files, barcodes, outfile_prefix = "alignR_"
   # rename
   if(!is.null(sample_names)){
     for(i in 1:length(barcodes)){
-      cmdRA <- paste0("mv ", outfile_prefix, "_RA_", barcodes[i], ".fastq", " ", sample_names[i], "_RA_", ".fastq")
-      cmdRB <- paste0("mv ", outfile_prefix, "_RB_", barcodes[i], ".fastq", " ", sample_names[i], "_RB_", ".fastq")
+      cmdRA <- paste0("mv ", outfile_prefix, "_RA_", barcodes[i], ".fastq", " ", sample_names[i], "_RA", ".fastq")
+      cmdRB <- paste0("mv ", outfile_prefix, "_RB_", barcodes[i], ".fastq", " ", sample_names[i], "_RB", ".fastq")
       system(cmdRA)
       system(cmdRB)
     }
