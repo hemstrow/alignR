@@ -1,11 +1,20 @@
 Package: alignR
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Process Pre-VCF Population Genetic Data
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Authors@R: c(person("William", "Hemstrom", email = "hemstrow@gmail.com",
+  role = c("aut", "cre")),
+  person("Michael", "Miller", role = c("aut", "ctb")))
+Description: R wrapper for shell and perl scripts to process pre-VCF/genotype 
+    .fastq population genetics files. Includes demultiplexing, filtering and 
+    alignment, and genotype calling.
+License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
+RoxygenNote: 7.1.2
+Imports:
+    doSNOW,
+    snow
+Depends:
+    foreach,
+    R (>= 3.6.0)
