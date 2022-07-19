@@ -8,7 +8,7 @@ demultiplex(
   R1_files,
   R2_files,
   barcodes,
-  outfile_prefix = "",
+  outfile_prefix = "alignR_",
   sample_names = NULL
 )
 }
@@ -29,8 +29,8 @@ will be replaced with these names.}
 \description{
 Splits paired-end sequencing .fastq files containing reads from multiple
 different plates with unique plate barcodes into different fastq files for
-each barcode. .fastq files must have barcode identifiers at the start of the
-second line for each read (the first line of information).
+each barcode. .fastq files must have barcode identifiers starting at the 5th
+base of sequence data.
 }
 \details{
 Currently, this only supports "strict" barcode matching without *any*
