@@ -86,10 +86,6 @@ align_to_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, par = 1){
   it_par <- (1:iters)%%par
   chunks <- split(fastqs, it_par)
 
-  # prepare reporting function
-  progress <- function(n) cat(sprintf("Chunk %d out of", n), par, "is complete.\n")
-
-
   # run
   output <- foreach::foreach(q = 1:par, .inorder = FALSE, .errorhandling = "pass",
                              .packages = "alignR"
