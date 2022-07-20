@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 
 # Installing and running alignR on a Windows OS
 
-alignR requires a suite of Unix-exclusive dependencies (SAMtools, ANGSD, and BWA) as well as both perl and a bash terminal in order to execute most of its functions. While installing these is pretty straight-forward on a Linux or MacOS-based machine, it's quite a bit more complicated on a Windows OS. Here, we'll walk through installing Windows Subsystem for Linux (wsl), R, Rstudio server, and the alignR dependencies on Windows. **Note that this requires Windows 10 Build 19041 and higher.**
+alignR is a wrapper for a set of bash and perl scripts, and requires a suite of Unix-exclusive dependencies (SAMtools, ANGSD, and BWA) as well as both perl and a bash terminal in order to execute most of its functions. While installing these is pretty straight-forward on a Linux or MacOS-based machine, it's quite a bit more complicated on a Windows OS. Here, we'll walk through installing Windows Subsystem for Linux (wsl), R, Rstudio server, and the alignR dependencies on Windows. **Note that this requires Windows 10 Build 19041 and higher.**
 
 To see your build, open your Windows command prompt, press your Windows key + R, then type `winver` in the run prompt.
 
