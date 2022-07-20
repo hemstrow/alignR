@@ -14,8 +14,7 @@ genotype_bams(
   postCutoff = 0.95,
   minQ = 20,
   minMapQ = 20,
-  par = 1,
-  read = FALSE
+  par = 1
 )
 }
 \arguments{
@@ -24,7 +23,7 @@ data for the individuals to genotype.}
 
 \item{outfile}{character. Prefix for the outfiles. Can include a filepath.}
 
-\item{minInd}{numeric, default `floor(length(bamfiles)/2)`. Minimum number of
+\item{minInd}{numeric, default \code{floor(length(bamfiles)/2)}. Minimum number of
 individuals a locus must be sequenced in in order to call genotypes.}
 
 \item{genotyper}{character, default "SAMtools". Name of the genotyper to use.
@@ -54,25 +53,22 @@ a given individual at a given locus.}
 
 \item{minQ}{numeric, default 20. The minimum Phred \emph{sequencing} quality
 score needed for a given sequenced base on a single read to be considered
-during genotyping. The default, 20, corresponds to 99% accuracy.}
+during genotyping. The default, 20, corresponds to 99\% accuracy.}
 
 \item{minMapQ}{numeric, default 20. The minimum Phred \emph{mapping} quality
 score needed for a given sequenced base on a single read to be considered
-during genotyping. The default, 20, corresponds to 99% accuracy.}
+during genotyping. The default, 20, corresponds to 99\% accuracy.}
 
 \item{par}{numeric, default 1. Number of cores to allow ANGSD to use for
 genotyping.}
-
-\item{read}{character, default FALSE. A vector of `doGeno` options, each of
-which will be automatically read into R and returned as a data.frame
-containing two columns noting the chromosome and bp position of each SNP,
-and then a column for each individual or each likelihood for each genotype
-for each individual (each row corresponds to a single SNP). Column names
-beyond the first two columns correspond to the individuals. See the
-documentation for the `doGeno` argument for options.}
 }
 \description{
 Uses the ANGSD (Analysis of Next Gen Sequencing Data) software to genotype
 individuals across a set of bamfiles using several different filtering
 options or genotyping methods. This function is a \emph{ wrapper for ANGSD}.
+}
+\author{
+William Hemstrom
+
+Michael Miller
 }

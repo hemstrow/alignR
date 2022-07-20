@@ -1,6 +1,17 @@
 # start-up checks
 .onAttach <- function(libname, pkgname){
 
+  packageStartupMessage("alignR requires a few UNIX specific dependencies.\n")
+  sys <- Sys.info()["sysname"]
+  if(sys == "Windows"){
+    packageStartupMessage("This can be tricky to install on windows. We suggest using a Linux virtual machine (check out Windows Subsystem for Linux, for example).\n")
+  }
+  else{
+    packageStartupMessage("These are fairly straightforward to install on Linux or MacOS using simple terminal commands--try searching for 'install X', where X is the missing tool. In many cases, sudo apt-get install works fine!\n")
+  }
+  packageStartupMessage("Checking dependencies now:\n")
+
+
   # try perl
   perl_check <- suppressWarnings(system("perl -v", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(perl_check == 127){
