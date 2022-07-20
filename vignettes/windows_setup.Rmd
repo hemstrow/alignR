@@ -1,0 +1,190 @@
+---
+title: "windows_setup"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{windows_setup}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval=FALSE
+)
+```
+
+# Installing and running alignR on a Windows OS
+
+alignR requires a suite of Unix-exclusive dependencies (SAMtools, ANGSD, and BWA) as well as both perl and a bash terminal in order to execute most of its functions. While installing these is pretty straight-forward on a Linux or MacOS-based machine, it's quite a bit more complicated on a Windows OS. Here, we'll walk through installing Windows Subsystem for Linux (wsl), R, Rstudio server, and the alignR dependencies on Windows. **Note that this requires Windows 10 Build 19041 and higher.**
+
+To see your build, open your Windows command prompt, press your Windows key + R, then type `winver` in the run prompt.
+
+## Installing WSL
+
+These instructions are taken from [the offical Windows WSL page](https://docs.microsoft.com/en-us/windows/wsl/install).
+
+First, open your windows command prompt by pressing Windows+R, then typing `cmd` at the run prompt. You can then install wsl using:
+
+```{powershell}
+wsl -install
+```
+
+This will install a Ubuntu Linux distribution by default. For other options, check out the offical WSL page linked above. You will need to set up a Ubuntu user name and password during the install process. Make sure that you remember these! Microsoft suggests best practices for this [here](https://docs.microsoft.com/en-us/windows/wsl/setup/environment#set-up-your-linux-username-and-password).
+
+## Installing R and Rstudio server on Linux
+
+Even if you have R and R studio installed on your Windows machine, you'll also need to install them on your WSL Linux distro. First, set up the apt that you'll need to grab both:
+
+```{bash}
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+sudo add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
+```
+
+You'll need to use your Ubuntu password during this process and several times going forward. Note that these instructions are taken from the excellent guide from the Rstudio folks, [here](https://support.rstudio.com/hc/en-us/articles/360049776974-Using-RStudio-Server-in-Windows-WSL2).
+
+Next, install R and a suite of R devtools (not the R package devtools!):
+
+```{bash}
+sudo apt install -y r-base r-base-core r-recommended r-base-dev gdebi-core build-essential libcurl4-gnutls-dev libxml2-dev libssl-dev
+```
+
+Next, install the Rstudio server:
+
+```{bash}
+wget https://rstudio.org/download/latest/stable/server/bionic/rstudio-server-latest-amd64.deb
+sudo gdebi rstudio-server-latest-amd64.deb
+```
+
+To launch the Rstudio server, type:
+
+```{bash}
+sudo rstudio-server start
+```
+
+from the WSL command line. Note that if you need to open the command prompt back up in the future, you can simply launch the "ubuntu" app that was installed on your computer during the first step of this section above.
+
+This will launch a remotely accessible Rstudio instance, running on your WSL but accessible via any web browser by navigating to: <http://localhost:8787/>. To shut down your server after you are done with it, type:
+
+```{bash}
+sudo rstudio-server stop
+```
+
+If you need to start your Rstudio server back up in the future, you can do so by running `sudo rstudio-server start` from your Ubuntu prompt again.
+
+## Installing alignR
+
+From your Rstudio server session, install the remotes package:
+
+```{r}
+install.packages("remotes")
+```
+
+Remember that this is a separate R install, and that you will need to re-install any packages that you may have previously installed on your primary R install.
+
+Next, install alignR:
+
+```{r}
+remotes::install_github("hemstrow/alignR")
+```
+
+## Installing alignR dependencies
+
+To determine which dependencies you still need, load in alignR.
+
+```{r}
+library(alignR)
+```
+
+alignR will tell you which dependencies are available and which are not.
+
+We will install all of our dependencies using the *terminal*, not the R console. You should see a tab labeled "Terminal" to the right of your "Console" tab in the console pane of your Rstudio. Click on this to access the terminal. If you don't see this, use Tools -\> Terminal -\> New Terminal on your Rstudio toolbar (or press Alt+Shift+R). You can also install all of these from your Ubuntu terminal directly.
+
+### bash and perl
+
+Your WSL will definitely have bash installed, and very likely have perl installed as well. If you don't have perl, you can install it by running:
+
+```{bash}
+curl -L http://xrl.us/installperlnix | bash
+```
+
+You can confirm that perl is installed using:
+
+```{bash}
+perl -v
+```
+
+to fetch your perl version.
+
+### SAMtools
+
+For most Linux distros (including the default Ubuntu distro installed via WSL), you can install SAMtools easily. First, update your apt library using:
+
+```{bash}
+ sudo apt-get update
+```
+
+then, install SAMtools with:
+
+```{bash}
+sudo apt-get install samtools
+```
+
+If this does not work, check out the [official SAMtools download page](http://www.htslib.org/download/) for alternative approaches.
+
+Check that SAMtools installed correctly with:
+
+```{bash}
+samtools
+```
+
+### bwa
+
+bwa can be installed just like SAMtools, using:
+
+```{bash}
+sudo apt-get install bwa
+```
+
+Check that bwa installed correctly with:
+
+```{bash}
+bwa
+```
+
+### ANGSD
+
+ANGSD is a bit trickier to install, since it can't be installed with `apt get-install`. Instead, we have to download and manually install the package. First, we probably need to install the `make` tool and a few other dependencies:
+
+```{bash}
+sudo apt-get install make gcc g++ libz-dev liblzma-dev libbz2-dev libcurl-dev libcurl4-openssl-dev
+```
+
+Next, we can follow the instructions [here](http://www.popgen.dk/angsd/index.php/Installation):
+
+```{bash}
+wget http://popgen.dk/software/download/angsd/angsd0.938.tar.gz
+tar xf angsd0.938.tar.gz
+cd htslib;make;cd ..
+cd angsd
+make HTSSRC=../htslib
+cd ..
+```
+
+The actual executable we need is at `angsd/angsd`. This executable needs to be on your system `PATH`, which is easily done by moving it to your `/usr/bin/`:
+
+```{bash}
+sudo cp ./angsd/angsd /usr/bin/
+```
+
+Note that this will leave a few relics in your directory that you can remove if you so desire.
+
+## Wrap-up
+
+This should be everything you need to run alignR. To verify that all dependencies are correctly installed, reload alignR:
+
+```{r}
+detach("package:alignR", unload = TRUE)
+library(alignR)
+```

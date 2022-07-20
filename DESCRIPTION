@@ -18,3 +18,7 @@ Imports:
 Depends:
     foreach,
     R (>= 3.6.0)
+Suggests: 
+    rmarkdown,
+    knitr
+VignetteBuilder: knitr

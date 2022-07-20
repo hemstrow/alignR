@@ -39,3 +39,4 @@ vignettes/*.pdf
 .Renviron
 
 alignR.Rproj
+inst/doc
