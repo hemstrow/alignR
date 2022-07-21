@@ -1,5 +1,5 @@
 ---
-title: "windows_setup"
+title: "alignR_setup"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{windows_setup}
@@ -73,15 +73,15 @@ sudo rstudio-server stop
 
 If you need to start your Rstudio server back up in the future, you can do so by running `sudo rstudio-server start` from your Ubuntu prompt again.
 
-## Installing alignR
+# Installing alignR
 
-From your Rstudio server session, install the remotes package:
+From your Rstudio session, install the remotes package:
 
 ```{r}
 install.packages("remotes")
 ```
 
-Remember that this is a separate R install, and that you will need to re-install any packages that you may have previously installed on your primary R install.
+If you just installed R on Windows WSL, remember that this is a separate R install and that you will need to re-install any packages that you may have previously installed on your primary R installation.
 
 Next, install alignR:
 
@@ -103,7 +103,7 @@ We will install all of our dependencies using the *terminal*, not the R console.
 
 ### bash and perl
 
-Your WSL will definitely have bash installed, and very likely have perl installed as well. If you don't have perl, you can install it by running:
+Any Linux distro will definitely have bash installed, and very likely have perl installed as well. If you don't have perl, you can install it by running:
 
 ```{bash}
 curl -L http://xrl.us/installperlnix | bash
@@ -178,7 +178,7 @@ The actual executable we need is at `angsd/angsd`. This executable needs to be o
 sudo cp ./angsd/angsd /usr/bin/
 ```
 
-Note that this will leave a few relics in your directory that you can remove if you so desire.
+Note that the ANGSD install will leave a few relics in your working directory that you can remove if you so desire.
 
 ## Wrap-up
 

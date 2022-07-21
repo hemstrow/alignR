@@ -9,7 +9,7 @@
   else{
     packageStartupMessage("These are fairly straightforward to install on Linux or MacOS using simple terminal commands--try searching for 'install X', where X is the missing tool. In many cases, sudo apt-get install works fine!\n")
   }
-  packageStartupMessage("Checking dependencies now:\n")
+  packageStartupMessage("The 'alignR_setup' vignette also has instructions for getting the dependencies installed.\nChecking dependencies now:\n")
 
 
   # try perl
