@@ -31,7 +31,7 @@ First, open your windows command prompt by pressing Windows+R, then typing `cmd`
 wsl -install
 ```
 
-This will install a Ubuntu Linux distribution by default. For other options, check out the offical WSL page linked above. You will need to set up a Ubuntu user name and password during the install process. Make sure that you remember these! Microsoft suggests best practices for this [here](https://docs.microsoft.com/en-us/windows/wsl/setup/environment#set-up-your-linux-username-and-password).
+This will install a Ubuntu Linux distribution by default. For other options, check out the official WSL page linked above. You will need to set up a Ubuntu user name and password during the install process. Make sure that you remember these! Microsoft suggests best practices for this [here](https://docs.microsoft.com/en-us/windows/wsl/setup/environment#set-up-your-linux-username-and-password).
 
 If you need to access your files, they are automatically available to your WSL installation at the system path `/mnt/`. For example, `/mnt/c/path/to/my/files/`.
 
