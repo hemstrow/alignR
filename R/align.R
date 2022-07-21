@@ -59,7 +59,12 @@ align_to_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, par = 1){
   }
   
   #==============prepare to run=================
+  reference <- normalizePath(reference)
+  RA_fastqs <- normalizePath(RA_fastqs)
+  RB_fastqs <- normalizePath(RB_fastqs)
+  
   if(!is.null(RB)){
+    is_single <- FALSE
     script <- .fetch_a_script("run_align.sh", "shell")
     
     # prepare file handles

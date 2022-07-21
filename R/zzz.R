@@ -38,10 +38,10 @@
   samtools_check <- suppressWarnings(system("samtools", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(samtools_check == 127){
     Sys.setenv(samtools_install = FALSE)
-    packageStartupMessage("No samtools installation detected! Some functions will fail.\n")
+    packageStartupMessage("No SAMtools installation detected! Some functions will fail.\n")
   }
   else{
-    packageStartupMessage("Samtools is good-to-go!\n")
+    packageStartupMessage("SAMtools is good-to-go!\n")
     Sys.setenv(samtools_install = TRUE)
   }
 

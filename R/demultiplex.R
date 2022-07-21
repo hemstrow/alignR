@@ -2,13 +2,18 @@
 #'
 #' Splits paired-end sequencing .fastq files containing reads from multiple
 #' different plates with unique plate barcodes into different fastq files for
-#' each barcode. .fastq files must have barcode identifiers at the start of the
-#' second line for each read (the first line of information).
+#' each plate barcode. 
+#' 
+#' The R1 and R3 .fastq files should contain the actual forward and reverse
+#' reads. The R2 .fastq file should contain only the plate barcodes. As is
+#' standard, the reads are assumed to be in the same order for each of the
+#' .fastq files.
 #'
 #' @param R1 character. File name for R1 (read one) file.
-#' @param R2 character. File name for R2 (read one) file.
+#' @param R2 character. File name for R2 (barcode read) file.
+#' @param R3 character. File name for R3 (read two) file
 #' @param barcodes character. Vector of barcodes to search for in read files.
-#' @param outfile_prefix character. prefix to be appeneded to each resulting
+#' @param outfile_prefix character. prefix to be appended to each resulting
 #'   .fastq file.
 #'
 #' @export
@@ -27,11 +32,15 @@ plate_split <- function(R1, R2, R3, barcodes, outfile_prefix = ""){
   if(length(msg) > 0){
     stop(msg)
   }
+  
+  R1 <- normalizePath(R1)
+  R2 <- normalizePath(R2)
+  R3 <- normalizePath(R3)
 
   #============execute=======
   script <- .fetch_a_script("BarcodeSplitList3Files.pl", "perl")
   cmd <- paste0("perl ", script, " ", R1, " ", R2, " ", R3, " ", paste0(barcodes, collapse = ","), " ", outfile_prefix)
-  shell(cmd)
+  system(cmd)
 }
 
 #' Split multiplexed reads with sample barcodes.
@@ -57,7 +66,7 @@ plate_split <- function(R1, R2, R3, barcodes, outfile_prefix = ""){
 #'
 #' @author William Hemstrom
 #' @author Michael Miller
-demultiplex <- function(R1, R2, barcodes, outfile_prefix = "alignR_", sample_names = NULL){
+demultiplex <- function(R1, R2, barcodes, outfile_prefix = "alignR", sample_names = NULL){
   #============sanity checks========
   msg <- character()
 
@@ -68,6 +77,9 @@ demultiplex <- function(R1, R2, barcodes, outfile_prefix = "alignR_", sample_nam
   if(length(msg) > 0){
     stop(msg)
   }
+  
+  R1 <- normalizePath(R1)
+  R2 <- normalizePath(R2)
 
   #============execute=======
 

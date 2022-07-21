@@ -89,13 +89,6 @@ genotype_bams <- function(bamfiles,
                          ".\n"))
   }
 
-  if(is.character(read)){
-    missing_doGeno <- !read %in% doGeno
-    if(any(missing_doGeno)){
-      warning("Some read returns requested but not included in doGeno. Adding these to doGeno")
-      doGeno <- c(doGeno, read[which(missing_doGeno)])
-    }
-  }
 
   # figure out genotyper code
   genotyper_table <- data.frame(matrix(c(1, "SAMtools",
@@ -129,6 +122,10 @@ genotype_bams <- function(bamfiles,
   if(length(msg) > 0){
     stop(msg)
   }
+  
+  bamfiles <- normalizePath(bamfiles)
+  
+  
 
   #==============prepare to run=================
   browser()

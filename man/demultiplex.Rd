@@ -4,7 +4,7 @@
 \alias{demultiplex}
 \title{Split multiplexed reads with sample barcodes.}
 \usage{
-demultiplex(R1, R2, barcodes, outfile_prefix = "alignR_", sample_names = NULL)
+demultiplex(R1, R2, barcodes, outfile_prefix = "alignR", sample_names = NULL)
 }
 \arguments{
 \item{R1}{character. File name for R1 (read one) file.}
