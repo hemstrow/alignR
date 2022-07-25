@@ -18,6 +18,11 @@
 # along with Stacks.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# Note: this version of the script has been edited from the version that comes 
+# with stacks and redistributed under the GNU General Public License with 
+# alignR. This version does not do genotype calling or population statistics, 
+# and is edited slightly to take a stacks path from alignR.
+
 use strict;
 use POSIX;
 use File::Temp qw/ mktemp /;
@@ -28,7 +33,7 @@ use constant true  => 1;
 use constant false => 0;
 
 my $dry_run      = false;
-my $exe_path     = "_BINDIR_";
+my $exe_path     = "stacks";
 my $out_path     = "";
 my $popmap_path  = "";
 my $sample_path  = "";
@@ -42,6 +47,7 @@ my $force_reexe  = false;
 my $genetic_map  = false;
 my $time         = "";
 
+
 my @parents;
 my @progeny;
 my @samples;
@@ -51,13 +57,6 @@ my (@_ustacks, @_cstacks, @_sstacks, @_tsv2bam, @_gstacks, @_populations);
 my $cmd_str = $0 . " " . join(" ", @ARGV);
 
 parse_command_line();
-
-#
-# Check for the existence of the necessary pipeline programs
-#
-foreach my $prog ("ustacks", "cstacks", "sstacks", "tsv2bam", "gstacks", "populations") {
-    die "Unable to find '" . $exe_path . $prog . "'.\n" if (!-e $exe_path . $prog);
-}
 
 my ($log, $log_fh, $sample);
 
@@ -161,7 +160,7 @@ sub execute_stacks {
             next;
         }
 
-        $cmd = $exe_path . "ustacks -t $sample->{'fmt'} -f $sample->{'path'} -o $out_path -i $sample_id" . $minc;
+        $cmd = $exe_path . " ustacks -t $sample->{'fmt'} -f $sample->{'path'} -o $out_path -i $sample_id" . $minc;
 
         if ($sample->{'path'} !~ /$sample->{'file'}.$sample->{'suffix'}$/) {
             # Guessing the sample name from the input path won't work.
@@ -244,7 +243,7 @@ sub execute_stacks {
         #
         $force_reexe = true if ($resume == true);
         
-        $cmd = $exe_path . "cstacks " . join(" ", @_cstacks);
+        $cmd = $exe_path . " cstacks " . join(" ", @_cstacks);
         print STDERR  "  $cmd\n\n";
         print $log_fh "$cmd\n\n";
 
@@ -275,7 +274,7 @@ sub execute_stacks {
         #
         $force_reexe = true if ($resume == true);
         
-        $cmd      = $exe_path . "sstacks -P $out_path " . join(" ", @_sstacks);
+        $cmd      = $exe_path . " sstacks -P $out_path " . join(" ", @_sstacks);
         print STDERR  "  $cmd\n\n";
         print $log_fh "$cmd\n\n";
 
@@ -312,7 +311,7 @@ sub execute_stacks {
             }
         }
 
-        $cmd = $exe_path . "tsv2bam -P $out_path $file_paths " . join(" ", @_tsv2bam);
+        $cmd = $exe_path . " tsv2bam -P $out_path $file_paths " . join(" ", @_tsv2bam);
         print STDERR  "  $cmd\n\n";
         print $log_fh "$cmd\n\n";
 
@@ -766,13 +765,13 @@ sub parse_command_line {
             if (! -e $time) {
                 die "Error: '$time': No such file or directory.\n";
             }
+            
         } else {
             print STDERR "Unknown command line option: '$_'\n";
             usage();
         }
     }
 
-    $exe_path = $exe_path . "/"          if (substr($exe_path, -1) ne "/");
     $out_path = substr($out_path, 0, -1) if (substr($out_path, -1) eq "/");
 
     if (length($popmap_path) == 0) {
@@ -834,10 +833,6 @@ denovo_map.pl --samples dir --popmap path --out-path dir [--paired [--rm-pcr-dup
     --paired: after assembling RAD loci, assemble mini-contigs with paired-end reads.
     --rm-pcr-duplicates: remove all but one set of read pairs of the same sample that have
                          the same insert length.
-
-  Population filtering options:
-    -r,--min-samples-per-pop: minimum percentage of individuals in a population required to process a locus for that population (for populations; default: 0)
-    -p,--min-populations: minimum number of populations a locus must be present in to process a locus (for populations; default: 1)
     
   Miscellaneous:
     --time-components (for benchmarking)

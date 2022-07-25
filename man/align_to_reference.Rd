@@ -18,21 +18,22 @@ alignment.}
 \item{par}{numeric, default 1. Number of cores to use for the alignments.}
 }
 \description{
-Aligns split, single- or paired-end reads to a reference genome using the bwa mem
-algorithm, them filters the resulting alignments using a few different
+Aligns split, single- or paired-end reads to a reference genome using the bwa
+mem algorithm, them filters the resulting alignments using a few different
 approaches via samtools.
 }
 \details{
 Paired-end reads are filtered following alignment by first removing PCR
-duplicates using \code{samtools fixmate} and \code{samtools markdup}, then poorly
-mapped reads using \code{samtools view} with \code{-q 5}, and then improperly paired
-reads using \code{samtools view} with  \code{-f 0x2}. The full alignment script can be
-accessed using \code{system.file("shell", "run_align.sh", "alignR")}.
+duplicates using \code{samtools fixmate} and \code{samtools markdup}, then
+poorly mapped reads using \code{samtools view} with \code{-q 5}, and then
+improperly paired reads using \code{samtools view} with  \code{-f 0x2}. The
+full alignment script can be accessed using \code{system.file("shell",
+"run_align.sh", "alignR")}.
 
 Single-end reads are not filtered following alignment, although filtering can
-(and usually should) be done while calling genotypes or doing other 
-down-stream analyses. The full alignment script can be
-accessed using \code{system.file("shell", "run_align_single.sh", "alignR")}.
+(and usually should) be done while calling genotypes or doing other
+down-stream analyses. The full alignment script can be accessed using
+\code{system.file("shell", "run_align_single.sh", "alignR")}.
 }
 \author{
 William Hemstrom

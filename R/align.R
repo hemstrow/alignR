@@ -139,11 +139,23 @@ align_to_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, par = 1){
 #'   RB (read one) files.
 #' @param reference character. Filepath for the reference genome to use for the
 #'   alignment.
+#' @param M numeric. The \code{-M} parameter from STACKS, the "number of
+#'   mismatches allowed between stacks within individuals" (see STACKS
+#'   documentation).
+#' @param n numeric, default \code{M}. The \code{-n} parameter from STACKS, the
+#'   "number of mismatches allowed between stacks between individuals" (see
+#'   STACKS documentation).
 #' @param par numeric, default 1. Number of cores to use for the alignments.
-#'
+#' @param check_headers logical, default TRUE. If TRUE, will check that fastq
+#'   headers are reasonable (end in /1 and /2 and otherwise match between paired
+#'   ends) before running STACKS if doing denovo assembly with paired-end reads.
+#'   Somewhat computationally and I/O intensive, so disable if confident that
+#'   headers are OK.
+#'   
 #' @author William Hemstrom
 #' @export
-align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, n, par = 1){
+align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, 
+                         n = M, par = 1, check_headers = TRUE){
   
   #===========make popmap===================
   RA_fastqs <- normalizePath(RA_fastqs)
@@ -151,6 +163,10 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, n, par = 1){
   
   RA_ngz <- gsub("\\.gz$", "", RA_fastqs)
   RB_ngz <- gsub("\\.gz$", "", RB_fastqs)
+  
+  if(any(duplicated(c(RA_ngz, RB_ngz)))){
+    stop("Some likely duplicated file names provided. Is it possible that you passed both .(fastq).gz and .(fastq) versions of the same file to RA and/or RB?\n")
+  }
   
   if(!is.null(RB_fastqs)){
     is_single <- FALSE
@@ -235,6 +251,13 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, n, par = 1){
           filepaths <- rep(new_dir, length(filepaths))
           map$RA <- map$RA_renamed
           map$RB <- map$RB_renamed
+          
+          if(any(RA_ngz != RA_fastqs)){
+            map$RA[which(RA_ngz != RA_fastqs)] <- paste0(map$RA[which(RA_ngz != RA_fastqs)], ".gz")
+          }
+          if(any(RB_ngz != RB_fastqs)){
+            map$RB[which(RB_ngz != RB_fastqs)] <- paste0(map$RB[which(RB_ngz != RB_fastqs)], ".gz")
+          }
         }
       }
       else{
@@ -246,56 +269,69 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, n, par = 1){
     popmap <- cbind(header = map$header, pop = "filler")
   }
   else{
-
+    popmap <- cbind(header = RA_ngz, pop = "filler")
+    map <- data.frame(RA = RA_fastqs)
   }
   
   
   # check for bad headers
-  repl_headers <- function(file, rstring){
-    script <- .fetch_a_script("header_fixer.pl", "perl")
+  repl_headers <- function(file1, file2, rstring, rstring2){
+    script <- .fetch_a_script("header_fixer_paired.pl", "perl")
     
     
-    if(tools::file_ext(file) == "gz"){
-      rezip <- TRUE
-      system("gunzip ", file)
+    if(tools::file_ext(file1) == "gz"){
+      rezip1 <- TRUE
+      system(paste0("gunzip ", file1))
+      file1 <- tools::file_path_sans_ext(file1)
     }
     else{
-      rezip <- FALSE
+      rezip1 <- FALSE
     }
     
-    system(paste0("perl ", script, " ", file, " ", rstring))
-    system(paste0("mv ", rstring, " ", file))
+    if(tools::file_ext(file2) == "gz"){
+      rezip2 <- TRUE
+      system(paste0("gunzip ", file2))
+      file2 <- tools::file_path_sans_ext(file2)
+    }
+    else{
+      rezip2 <- FALSE
+    }
     
-    if(rezip){
-      system("gzip ", file)
+    system(paste0("perl ", script, " ", file1, " ", file2, " ", rstring, " ", rstring2))
+    system(paste0("mv ", rstring, " ", file1))
+    system(paste0("mv ", rstring2, " ", file2))
+    
+    if(rezip1 | rezip2){
+      system(paste0("gzip ", ifelse(rezip1, file1,""), " ", ifelse(rezip2, file2, "")))
     }
   }
   
-  cat("Checking and fixing any unrecognized headers in .fastq files.\n")
-
-  rstrings <- stringi::stri_rand_strings(length(c(RA_fastqs, RB_fastqs)), length(c(RA_fastqs, RB_fastqs))*10)
-  bad_rstrings <- file.exists(file.path(filepaths[1], rstrings))
-  
-  while(any(bad_rstrings)){
-    rstrings[bad_rstrings] <- stringi::stri_rand_strings(sum(bad_rstrings), length(c(RA_fastqs, RB_fastqs))*10)
+  if(check_headers & !is.null(RB_fastqs)){
+    cat("Checking and fixing any unrecognized headers in .fastq files.\nProgress:\t")
+    
+    rstrings <- stringi::stri_rand_strings(length(c(RA_fastqs, RB_fastqs)), length(c(RA_fastqs, RB_fastqs))*10)
     bad_rstrings <- file.exists(file.path(filepaths[1], rstrings))
-  }
-  
-  browser()
-  prog <- 1
-  for(i in 1:length(RA_fastqs)){
-    repl_headers(file.path(filepaths[1], map$RA[i]), file.path(filepaths[1], rstrings[prog]))
-    prog <- prog + 1
     
-    if(!is.null(RB_fastqs)){
-      repl_headers(file.path(filepaths[1], map$RB[i]), file.path(filepaths[1], rstrings[prog]))
-      prog <- prog + 1
+    while(any(bad_rstrings)){
+      rstrings[bad_rstrings] <- stringi::stri_rand_strings(sum(bad_rstrings), length(c(RA_fastqs, RB_fastqs))*10)
+      bad_rstrings <- file.exists(file.path(filepaths[1], rstrings))
     }
+    
+    prog <- 1
+    for(i in 1:length(RA_fastqs)){
+      cat(i, " ")
+      repl_headers(file.path(filepaths[1], map$RA[i]), 
+                   file.path(filepaths[1], map$RB[i]), 
+                   file.path(filepaths[1], rstrings[prog]),
+                   file.path(filepaths[1], rstrings[prog + 1]))
+      prog <- prog + 2
+    }
+    cat("Done.\n")
   }
-  
 
   # zip if not zipped
-  fileext <- tools::file_ext(c(RA_fastqs, RB_fastqs))
+  fileext <- tools::file_ext(c(map$RA, map$RB))
+  all_files <- file.path(filepaths[1], c(map$RA, map$RB))
   
   if(any(fileext != "gz")){
     if(interactive()){
@@ -310,18 +346,18 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, n, par = 1){
         stop("stacks expects that each file is zipped (.gz).\n")
       }
       
-      for(i in 1:length(fileext)){
-        if(fileext[i] != "gz"){
-          system(paste0("gzip -c ", c(RA_fastqs, RB_fastqs)[i], " > ", paste0(c(RA_fastqs, RB_fastqs)[i], ".gz")))
-        }
-      }
+      cat("gzipping", sum(fileext != "gz"), "files... ")
       
-      RA_fastqs[which(tools::file_ext(RA_fastqs) != "gz")] <-
-        paste0(RA_fastqs[which(tools::file_ext(RA_fastqs) != "gz")], ".gz")
+      system(paste0("gzip ", paste0(all_files[which(fileext != "gz")], collapse = " ")))
+      
+      cat("Done.\n")
+      
+      map$RA[which(tools::file_ext(map$RA) != "gz")] <-
+        paste0(map$RA[which(tools::file_ext(map$RA) != "gz")], ".gz")
       
       if(!is.null(RB_fastqs)){
-        RB_fastqs[which(tools::file_ext(RB_fastqs) != "gz")] <-
-          paste0(RB_fastqs[which(tools::file_ext(RB_fastqs) != "gz")], ".gz")
+        map$RB[which(tools::file_ext(map$RB) != "gz")] <-
+          paste0(map$RB[which(tools::file_ext(map$RB) != "gz")], ".gz")
       }
     }
     else{
@@ -331,7 +367,6 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, n, par = 1){
   
   write.table(popmap, "./alignR_popmap", quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
   #===========run stacks=====================
-  browser()
   script <- .fetch_a_script("denovo_map_edit.pl", "perl")
   
   cmd <- paste0(script, 
@@ -340,7 +375,8 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, n, par = 1){
                 " -M ", M, 
                 " -n ", n, 
                 " -o ", getwd(), 
-                " --popmap alignR_popmap")
+                " --popmap alignR_popmap",
+                " -e ", ifelse(Sys.getenv("stacks_install") == "general", "stacks", ""))
   cmd <- ifelse(is_single, cmd, paste0(cmd, " --paired"))
   
   system(cmd)
