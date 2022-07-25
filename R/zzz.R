@@ -67,4 +67,16 @@
     packageStartupMessage("bwa is good-to-go!\n")
     Sys.setenv(bwa_install = TRUE)
   }
+  
+  # try stacks
+  stacks_check <- suppressWarnings(system("stacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  stacks_check2 <- suppressWarnings(system("cstacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(any(c(stacks_check, stacks_check2) == 0)){
+    Sys.setenv(stacks_install = ifelse(stacks_check, "stacks", "cstacks"))
+    packageStartupMessage("STACKS is good-to-go!\n")
+  }
+  else{
+    Sys.setenv(stacks_install = FALSE)
+    packageStartupMessage("No STACKS installation detected! Some functions will fail.\n")
+  }
 }

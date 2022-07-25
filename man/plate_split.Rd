@@ -4,30 +4,33 @@
 \alias{plate_split}
 \title{Split paired-end .fastq files with reads from different plates.}
 \usage{
-plate_split(R1, R2, R3, barcodes, outfile_prefix = "")
+plate_split(R1, R2 = NULL, R3, indices, outfile_prefix = "")
 }
 \arguments{
 \item{R1}{character. File name for R1 (read one) file.}
 
-\item{R2}{character. File name for R2 (barcode read) file.}
+\item{R2}{character or NULL, default NULL. File name for R2 (index read)
+file. If NULL, if NULL assumes that the plate index is at the end of the
+.fastq headers the R1 and R3 files.}
 
 \item{R3}{character. File name for R3 (read two) file}
 
-\item{barcodes}{character. Vector of barcodes to search for in read files.}
+\item{indices}{character. Vector of indices to search for in read files.}
 
 \item{outfile_prefix}{character. prefix to be appended to each resulting
 .fastq file.}
 }
 \description{
 Splits paired-end sequencing .fastq files containing reads from multiple
-different plates with unique plate barcodes into different fastq files for
-each plate barcode.
+different plates with unique plate indices into different fastq files for
+each plate index.
 }
 \details{
 The R1 and R3 .fastq files should contain the actual forward and reverse
-reads. The R2 .fastq file should contain only the plate barcodes. As is
-standard, the reads are assumed to be in the same order for each of the
-.fastq files.
+reads. The optional R2 .fastq file should contain only the plate indices. As
+is standard, the reads are assumed to be in the same order for each of the
+.fastq files. If no R2 file is provided, the index is assumed to be at the
+end of the headers for each read in the R1 and R3 files.
 }
 \author{
 William Hemstrom
