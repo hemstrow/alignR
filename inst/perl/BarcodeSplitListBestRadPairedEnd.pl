@@ -1,8 +1,9 @@
-if ($#ARGV == 3){
+if ($#ARGV == 4){
         $file1 = $ARGV[0];
         $file2 = $ARGV[1];
         $barcode = $ARGV[2];
         $prefix = $ARGV[3];
+        $stacks_header = $ARGV[4];
 }
 else {
         print "Incorrect number of arguments provided.\n";
@@ -38,7 +39,53 @@ while (<FILE1>){
         $f2b = <FILE2>;
         $f2c = <FILE2>;
         $f2d = <FILE2>;
+        
+        # fix headers to stacks style if requested
+        if ($stacks_header){
+          @sheader1 = split(//, $f1a);
+          @sheaderR2 = split(//, $f2a);
+          @equi_array = ();
+  
+          # check if we have to actually do anything
+          $need_to_edit_headers = 1;
+          if($sheader1[$#sheader1 - 1] eq "/" and $sheader1[$#sheader1] eq 1){
+            if($sheaderR2[$#sheaderR2 - 1] eq "/" and $sheaderR2[$#sheaderR2] eq 2){
+              $need_to_edit_headers = 0;
+            }
+          }
+          elsif($sheader1[$#sheader1 - 1] eq "/" and $sheader1[$#sheader1] eq 2){
+            if($sheaderR2[$#sheaderR2 - 1] eq "/" and $sheaderR2[$#sheaderR2] eq 1){
+              $need_to_edit_headers = 0;
+            }
+          }
+  
+          if($need_to_edit_headers){
+            # figure out matching header portion
+            $prog = 0;
+            foreach $h1p (@sheader1){
+              if($h1p eq $sheaderR2[$prog]){
+                if($h1p =~ /\S/){
+                  push(@equi_array, $h1p);
+                }
+              }
+              else{
+                last;
+              }
+              $prog++;
+            }
 
+            $equi = join("", @equi_array);
+    
+            @sheader = split(/ /, $f1a);
+            $tail = $sheader[$#sheader];
+    
+            # make the headers the common pattern + /1 or /2, easy since R1 is always /1
+            $f1a = $equi . "/" . 1 ."\n";
+            $f2a = $equi . "/" . 2 ."\n";
+          }
+        }
+
+        # demultiplex
         $bc1 = substr($f1b,0,$barcode_length);
         $bc2 = substr($f2b,0,$barcode_length);
 
