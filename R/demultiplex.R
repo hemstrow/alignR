@@ -24,7 +24,6 @@
 #' @author William Hemstrom
 #' @author Michael Miller
 plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_split"){
-  browser()
 
   #============sanity checks========
   msg <- character()

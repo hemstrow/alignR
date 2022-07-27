@@ -128,7 +128,6 @@ genotype_bams <- function(bamfiles,
   
 
   #==============prepare to run=================
-  browser()
   old.scipen <- options("scipen")
   options(scipen = 999)
   script <- .fetch_a_script("angsd_genotypes.sh", "shell")
