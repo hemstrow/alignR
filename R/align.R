@@ -151,23 +151,50 @@ align_to_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, par = 1){
 #'   ends) before running STACKS if doing denovo assembly with paired-end reads.
 #'   Somewhat computationally and I/O intensive, so disable if confident that
 #'   headers are OK.
+#' @param stacks_cleanup logical, default TRUE. If TRUE, files other than .bam
+#'   files created by stacks will be removed.
 #'   
 #' @author William Hemstrom
 #' @export
 align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, 
-                         n = M, par = 1, check_headers = TRUE){
+                         n = M, par = 1, check_headers = FALSE,
+                         stacks_cleanup = TRUE){
   
-  #===========make popmap===================
+  #==========sanity checks==========================
   RA_fastqs <- normalizePath(RA_fastqs)
   if(!is.null(RB_fastqs)){RB_fastqs <- normalizePath(RB_fastqs)}
   
   RA_ngz <- gsub("\\.gz$", "", RA_fastqs)
   RB_ngz <- gsub("\\.gz$", "", RB_fastqs)
   
+  msg <- character(0)
+  
   if(any(duplicated(c(RA_ngz, RB_ngz)))){
-    stop("Some likely duplicated file names provided. Is it possible that you passed both .(fastq).gz and .(fastq) versions of the same file to RA and/or RB?\n")
+    msg <- c(msg, "Some likely duplicated file names provided. Is it possible that you passed both .(fastq).gz and .(fastq) versions of the same file to RA and/or RB?\n")
   }
   
+  
+  
+  if(!.check_system_install("bash")){
+    msg <- c(msg, "No bash install located on system path.\n")
+  }
+  if(!.check_system_install("samtools")){
+    msg <- c(msg, "No samtools install located on system path.\n")
+  }
+  if(!.check_system_install("perl")){
+    msg <- c(msg, "No perl install located on system path.\n")
+  }
+  stacks.ver <- Sys.getenv("stacks_install")
+  if(isFALSE(stacks.ver)){
+    msg <- c(msg, "No stacks install located on system path.\n")
+  }
+  
+  if(length(msg) > 0){
+    stop(msg)
+  }
+  
+  
+  #===========make popmap and prep===================
   if(!is.null(RB_fastqs)){
     is_single <- FALSE
     
@@ -245,8 +272,9 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
           
           colnames(map)[5:6] <- c("RA_renamed", "RB_renamed")
           
-          write.table(map[,c("RA", "RB", "header", "RA_renamed", "RB_renamed")], paste0(filepaths[1], "/rename_key.txt"), col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
-          cat("Renaming successfull. Key for renamed files located at", paste0(filepaths[1], "/rename_key.txt"), "\n")
+          rename_key <- map[,c("RA", "RB", "header", "RA_renamed", "RB_renamed")]
+          write.table(rename_key, paste0(filepaths[1], "/rename_key.txt"), col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
+          cat("Renaming successfull. Key for renamed files located at", paste0(filepaths[1], "/rename_key.txt"), "\n\tNote that resulting bam files will be renamed back to their original RA prefixes!\n")
           
           filepaths <- rep(new_dir, length(filepaths))
           map$RA <- map$RA_renamed
@@ -376,8 +404,40 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                 " -n ", n, 
                 " -o ", getwd(), 
                 " --popmap alignR_popmap",
-                " -e ", ifelse(Sys.getenv("stacks_install") == "general", "stacks", ""))
+                " -e ", ifelse(stacks.ver == "general", "stacks", ""))
   cmd <- ifelse(is_single, cmd, paste0(cmd, " --paired"))
   
   system(cmd)
+  
+  cat("Cleaning up and renaming if needed.\n")
+  if(stacks_cleanup){
+    rm.files <- list.files(".", "matches\\.tsv.\\gz")
+    rm.files <- c(rm.files, list.files(".", "snps\\.tsv\\.gz"))
+    rm.files <- c(rm.files, list.files(".", "alleles\\.tsv\\.gz"))
+    rm.files <- c(rm.files, list.files(".", "tags\\.tsv\\.gz"))
+    rm.files <- c(rm.files, "tsv2bam.log", "denovo_map.log")
+    file.remove(rm.files)
+  }
+  
+  # rename files according to the map
+  if(exists("rename_key")){
+    bamnames <- paste0(rename_key$header,
+                       ".matches.bam")
+    new_bamnames <- paste0(tools::file_path_sans_ext(gsub("\\.gz", "", rename_key$RA)), ".matches.bam")
+    for(i in 1:nrow(rename_key)){
+      mv_cmd <- paste0("mv ", bamnames[i], " ", new_bamnames[i])
+      system(mv_cmd)
+    }
+  }
+  else{
+    new_bamnames <- paste0(tools::file_path_sans_ext(gsub("\\.gz", "", map$RA)), ".matches.bam")
+  }
+  
+  cat("Indexing reads.\n")
+  # index
+  for(i in 1:length(new_bamnames)){
+    system(paste0("samtools index ", new_bamnames[i]))
+  }
+  
+  cat("Complete!\n")
 }
