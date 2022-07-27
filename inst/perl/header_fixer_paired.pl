@@ -61,7 +61,7 @@ while (<FILE>) {
     $equi = join("", @equi_array);
     
     @sheader = split(/ /, $header);
-    $tail = $sheader[$#header];
+    $tail = $sheader[$#sheader];
     
     # replace the common ending pattern 1:N:0:1 with /1 or /2
     if($tail =~ m/(\d):N:\d:\d\n/){
