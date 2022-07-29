@@ -4,7 +4,7 @@
 \alias{plate_split}
 \title{Split paired-end .fastq files with reads from different plates.}
 \usage{
-plate_split(R1, R2 = NULL, R3, indices, outfile_prefix = "")
+plate_split(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_split")
 }
 \arguments{
 \item{R1}{character. File name for R1 (read one) file.}
@@ -17,8 +17,8 @@ file. If NULL, if NULL assumes that the plate index is at the end of the
 
 \item{indices}{character. Vector of indices to search for in read files.}
 
-\item{outfile_prefix}{character. prefix to be appended to each resulting
-.fastq file.}
+\item{outfile_prefix}{character, default plate_split. prefix to be appended
+to each resulting .fastq file.}
 }
 \description{
 Splits paired-end sequencing .fastq files containing reads from multiple

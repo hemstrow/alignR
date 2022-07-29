@@ -4,21 +4,34 @@
 \alias{demultiplex}
 \title{Split multiplexed reads with sample barcodes.}
 \usage{
-demultiplex(R1, R2, barcodes, outfile_prefix = "alignR", sample_names = NULL)
+demultiplex(
+  R1,
+  R2 = NULL,
+  barcodes,
+  outfile_prefix = "alignR",
+  sample_names = NULL,
+  stacks_header = TRUE
+)
 }
 \arguments{
 \item{R1}{character. File name for R1 (read one) file.}
 
-\item{R2}{character. File name for R2 (read one) file.}
+\item{R2}{character, default NULL. File name for R2 (read one) file. If NULL,
+assumes data is single-end.}
 
 \item{barcodes}{character. Vector of barcodes to search for in read files.}
 
-\item{outfile_prefix}{character. prefix to be appeneded to each resulting
+\item{outfile_prefix}{character. prefix to be appended to each resulting
 .fastq file.}
 
 \item{sample_names}{character. Vector of names for output files corresponding
 in order to the provided barcodes. Prefix and barcodes will in names
 will be replaced with these names.}
+
+\item{stacks_header}{logical, default TRUE. If TRUE, will fix fastq headers
+to be consistent with those expected by stacks (a unique header ending in
+either /1 or /2 for read one and two, respectively). If FALSE, headers are
+not changed. Only applicable to paired-end sequence data.}
 }
 \description{
 Splits paired-end sequencing .fastq files containing reads from multiple
@@ -28,7 +41,7 @@ base of sequence data.
 }
 \details{
 Currently, this only supports "strict" barcode matching without *any*
-sequence mismatches.
+sequence mismatches. Supports single- or paired-end sequence data.
 }
 \author{
 William Hemstrom

@@ -37,6 +37,10 @@ If you need to access your files, they are automatically available to your WSL i
 
 ## Installing R and Rstudio server on Linux
 
+NOTE: **For non-Derbian or Ubuntu like Linux installations you'll need to use something other than apt-get that varies based on your system!**
+
+For MacOS, you can install R and R studio normally!
+
 Even if you have R and R studio installed on your Windows machine, you'll also need to install them on your WSL Linux distro. First, set up the apt that you'll need to grab both:
 
 ```{bash}
@@ -105,6 +109,8 @@ We will install all of our dependencies using the *terminal*, not the R console.
 
 ### bash and perl
 
+
+
 Any Linux distro will definitely have bash installed, and very likely have perl installed as well. If you don't have perl, you can install it by running:
 
 ```{bash}
@@ -133,6 +139,14 @@ then, install SAMtools with:
 sudo apt-get install samtools
 ```
 
+For MacOS users, you can instead use:
+
+```{bash}
+sudo brew install samtools
+```
+
+
+
 If this does not work, check out the [official SAMtools download page](http://www.htslib.org/download/) for alternative approaches.
 
 Check that SAMtools installed correctly with:
@@ -148,6 +162,13 @@ bwa can be installed just like SAMtools, using:
 ```{bash}
 sudo apt-get install bwa
 ```
+
+For MacOS users, you can instead use:
+
+```{bash}
+sudo brew install bwa
+```
+
 
 Check that bwa installed correctly with:
 

@@ -72,14 +72,14 @@ genotype_bams <- function(bamfiles,
     index_files <- paste0(bamfiles, ".bai")
     indexed <- file.exists(index_files)
     if(any(!indexed)){
-      cat(sum(!indexed), "bam files not indexed. Indexing with 'samtools faidx'.\n")
+      cat(sum(!indexed), "bam files not indexed. Indexing with 'samtools index'.\n")
 
       if(!.check_system_install("samtools")){
         stop("No samtools install located on system path.\n")
       }
 
       for(i in 1:sum(!indexed)){
-        system(paste0("samtools faidx ", bamfiles[!indexed][i]))
+        system(paste0("samtools index ", bamfiles[!indexed][i]))
       }
     }
   }
