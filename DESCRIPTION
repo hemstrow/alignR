@@ -1,7 +1,7 @@
 Package: alignR
 Type: Package
 Title: Process Pre-VCF Population Genetic Data
-Version: 0.1.0
+Version: 0.0.1
 Authors@R: c(person("William", "Hemstrom", email = "hemstrow@gmail.com",
   role = c("aut", "cre")),
   person("Michael", "Miller", role = c("aut", "ctb")))
