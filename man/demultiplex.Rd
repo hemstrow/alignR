@@ -33,6 +33,13 @@ to be consistent with those expected by stacks (a unique header ending in
 either /1 or /2 for read one and two, respectively). If FALSE, headers are
 not changed. Only applicable to paired-end sequence data.}
 }
+\value{
+Generates files split by barcode in the directory of the R1 file(s),
+  named SAMPLENAME_RN.fastq or outfile_prefix_RN_BARCODE.fastq, if provided
+  with sample names or not, respectively, where N is A or B (for the reads
+  with and without barcodes, respectively). In R, returns a list containing
+  the paths to each output file.
+}
 \description{
 Splits paired-end sequencing .fastq files containing reads from multiple
 different plates with unique plate barcodes into different fastq files for

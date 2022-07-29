@@ -15,7 +15,8 @@ align_denovo(
   re_align = TRUE,
   mapQ = 5,
   remove_duplicates = TRUE,
-  remove_improper_pairs = TRUE
+  remove_improper_pairs = TRUE,
+  ask_confirmation = TRUE
 )
 }
 \arguments{
@@ -55,13 +56,17 @@ be removed using \code{samtools view -q mapQ}. Only valid for paired-end
 reads.}
 
 \item{remove_duplicates}{logical, default TRUE. Used only if re_align = TRUE,
-passed to \code{align_reference}. If TRUE, PCR duplicates (clones) will be
+  passed to \code{align_reference}. If TRUE, PCR duplicates (clones) will be
 removed using \code{samtools markdup}. Only valid for paired-end reads.}
 
 \item{remove_improper_pairs}{logical, default FALSE. Used only if re_align =
 TRUE, passed to \code{align_reference}. If TRUE, improperly paired reads
 reads will be removed using \code{samtools view -f 0x2}. Only valid for
 paired-end reads, and should usually be FALSE for denovo alignments.}
+
+\item{ask_confirmation}{logical, default TRUE. If TRUE, \code{alignR} will
+ask for confirmation before moving or renaming files. If FALSE,
+\code{alignR} will move or rename without confirmation.}
 
 \item{reference}{character. Filepath for the reference genome to use for the
 alignment.}
@@ -73,7 +78,7 @@ If the \code{stacks_cleanup} arugment is TRUE, catalog.fa and index
   'x.alns.sort.bam.bai' or 'x.sort.flt.bam' and 'x.sort.flt.bam.bai' where
   'x' is the prefix for the RA fastqs, depending on if re-alignment with
   \code{bwa mem} via \code{align_reference} is requested with the
-  \code{re_align} argument.
+  \code{re_align} argument. In R, returns a vector of output file paths.
 }
 \description{
 Aligns split, single- or paired-end reads to a reference genome using the

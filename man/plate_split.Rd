@@ -10,7 +10,7 @@ plate_split(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_split")
 \item{R1}{character. File name for R1 (read one) file.}
 
 \item{R2}{character or NULL, default NULL. File name for R2 (index read)
-file. If NULL, if NULL assumes that the plate index is at the end of the
+  file. If NULL, if NULL assumes that the plate index is at the end of the
 .fastq headers the R1 and R3 files.}
 
 \item{R3}{character. File name for R3 (read two) file}
@@ -19,6 +19,12 @@ file. If NULL, if NULL assumes that the plate index is at the end of the
 
 \item{outfile_prefix}{character, default plate_split. prefix to be appended
 to each resulting .fastq file.}
+}
+\value{
+Generates files split by index in the directory of the R1 file(s),
+  named outfile_prefix_RN_INDEX.fastq, where N is 1, 2, 3 three (for the R1,
+  R2, and R3 files). In R, returns a list containing the paths to each output
+  file.
 }
 \description{
 Splits paired-end sequencing .fastq files containing reads from multiple

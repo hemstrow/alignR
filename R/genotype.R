@@ -2,13 +2,15 @@
 #'
 #' Uses the ANGSD (Analysis of Next Gen Sequencing Data) software to genotype
 #' individuals across a set of bamfiles using several different filtering
-#' options or genotyping methods. This function is a \emph{ wrapper for ANGSD}.
+#' options or genotyping methods. This function is a \emph{wrapper for ANGSD}.
 #'
 #' @param bamfiles character. Vector of filepaths to the bamfiles containing
 #'   data for the individuals to genotype.
-#' @param outfile character. Prefix for the outfiles. Can include a filepath.
-#' @param minInd numeric, default \code{floor(length(bamfiles)/2)}. Minimum number of
-#'   individuals a locus must be sequenced in in order to call genotypes.
+#' @param outfile_prefix character, default "genotypes". Prefix for the
+#'   outfiles.
+#' @param minInd numeric, default \code{floor(length(bamfiles)/2)}. Minimum
+#'   number of individuals a locus must be sequenced in in order to call
+#'   genotypes.
 #' @param genotyper character, default "SAMtools". Name of the genotyper to use.
 #'   Options: \itemize{\item{SAMtools} \item{GATK} \item{SOAPsnp} \item{phys}
 #'   \item{sample: } randomly sample reads to make the genotypes (therefore
@@ -22,11 +24,13 @@
 #'   homozygous major, hetoerzygote, homozygous minor, or missing data,
 #'   respectively. \item{NN: } Print alleles as paired nucleotides (AA, AC, CC,
 #'   for example). NN denotes missing data. \item{all_posteriors: } Prints
-#'   posterior probabilities for \emph{all} genotypes at each locus.
+#'   posterior probabilities for \emph{all three} genotypes at each locus.
 #'   \item{called_posterior: } Prints the posterior probability for \emph{only
-#'   the called genotype}. \item{SNP_genotype_posteriors: } Prints the posterior
-#'   probabilities for \emph{the three genotypes possible for the major and
-#'   minor allele} at each locus only.}
+#'   the called genotype}. \item{binary: } Prints the posterior probabilities
+#'   for the three genotypes \emph{in binary}. This will convert all other
+#'   selected options to binary as well.} If multiple options are selected, they
+#'   \emph{all be printed to a single file}, in the order provided in this
+#'   documentation.
 #' @param postCutoff numeric, default 0.95. The minimum posterior probability
 #'   required for the most likely genotype for the genotype to be printed at for
 #'   a given individual at a given locus.
@@ -36,15 +40,22 @@
 #' @param minMapQ numeric, default 20. The minimum Phred \emph{mapping} quality
 #'   score needed for a given sequenced base on a single read to be considered
 #'   during genotyping. The default, 20, corresponds to 99\% accuracy.
+#' @param unzip logical, default FALSE. If TRUE, resulting genotype file will be
+#'   unzipped.
 #' @param par numeric, default 1. Number of cores to allow ANGSD to use for
 #'   genotyping.
 #'
+#' @return Generates genotype files in the requested format named
+#'   outfile_prefix.geno(.gz) in the directory of the first bamfile. The file
+#'   will be zipped (.gz) if \code{unzip} is not TRUE. In R, returns file path
+#'   to genotype output.
+#'   
 #' @author William Hemstrom
 #' @author Michael Miller
 #'
 #' @export
 genotype_bams <- function(bamfiles,
-                          outfile,
+                          outfile_prefix = "genotypes",
                           minInd = floor(length(bamfiles)/2),
                           genotyper = "SAMtools",
                           SNP_pval = 0.00000001,
@@ -52,6 +63,7 @@ genotype_bams <- function(bamfiles,
                           postCutoff = 0.95,
                           minQ = 20,
                           minMapQ = 20,
+                          unzip = FALSE,
                           par = 1){
   #=============sanity checks===================
   msg <- character()
@@ -106,6 +118,7 @@ genotype_bams <- function(bamfiles,
   }
 
   # figure out doGeno
+  browser()
   doGeno_table <- data.frame(number = c(1, 2, 4, 8, 16, 32),
                              word = c("major_minor", "numeric", "NN", "all_posteriors",
                                       "called_posterior", "SNP_genotype_posteriors"))
@@ -125,7 +138,8 @@ genotype_bams <- function(bamfiles,
   
   bamfiles <- normalizePath(bamfiles)
   
-  
+  dir <- dirname(bamfiles[1])
+  outfile <- file.path(dir, outfile_prefix)
 
   #==============prepare to run=================
   old.scipen <- options("scipen")
@@ -151,6 +165,15 @@ genotype_bams <- function(bamfiles,
                 )
 
   system(cmd)
-
+  
+  output_filename <- paste0(outfile, ".geno.gz")
+  
+  if(unzip){
+    system(paste0("gunzip ", outfile, ".geno.gz"))
+    output_filename <- paste0(outfile, ".geno")
+  }
+  
   options(scipen = old.scipen)
+  
+  return(output_filename)
 }

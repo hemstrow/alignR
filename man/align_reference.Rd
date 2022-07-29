@@ -37,6 +37,11 @@ valid for paired-end reads.}
 
 \item{par}{numeric, default 1. Number of cores to use for the alignments.}
 }
+\value{
+Generates 'x.sort.flt.bam' and 'x.sort.flt.bam.bai' files (sorted
+  alignments and index files, respectively), where 'x' is the prefix for the
+  RA. fastqs. In R, returns a vector of output file paths.
+}
 \description{
 Aligns split, single- or paired-end reads to a reference genome using the bwa
 mem algorithm, them filters the resulting alignments using a few different

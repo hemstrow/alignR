@@ -13,11 +13,16 @@
 #' @param R1 character. File name for R1 (read one) file.
 #' @param R2 character or NULL, default NULL. File name for R2 (index read)
 #'   file. If NULL, if NULL assumes that the plate index is at the end of the
-#'   .fastq headers the R1 and R3 files.
+#' .fastq headers the R1 and R3 files.
 #' @param R3 character. File name for R3 (read two) file
 #' @param indices character. Vector of indices to search for in read files.
 #' @param outfile_prefix character, default plate_split. prefix to be appended
 #'   to each resulting .fastq file.
+#'
+#' @return Generates files split by index in the directory of the R1 file(s),
+#'   named outfile_prefix_RN_INDEX.fastq, where N is 1, 2, 3 three (for the R1,
+#'   R2, and R3 files). In R, returns a list containing the paths to each output
+#'   file.
 #'
 #' @export
 #'
@@ -56,6 +61,9 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
   R1 <- normalizePath(R1)
   if(!is.null(R2)){R2 <- normalizePath(R2)}
   R3 <- normalizePath(R3)
+  
+  dir <- dirname(R1)
+  outfile_prefix <- paste0(dir, "/", outfile_prefix)
 
   #============execute=======
   if(index_in_header){
@@ -67,6 +75,16 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
     cmd <- paste0("perl ", script, " ", R1, " ", R2, " ", R3, " ", paste0(indices, collapse = ","), " ", outfile_prefix)
   }
   system(cmd)
+  
+  
+  file_names <- list(R1 = paste0(outfile_prefix, "_R1_", indices, ".fastq"),
+                     R2 = paste0(outfile_prefix, "_R2_", indices, ".fastq"),
+                     R3 = paste0(outfile_prefix, "_R3_", indices, ".fastq"))
+  if(index_in_header){
+    file_names$R2 <- NULL
+  }
+  
+  return(file_names)
 }
 
 #' Split multiplexed reads with sample barcodes.
@@ -92,7 +110,13 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
 #'   to be consistent with those expected by stacks (a unique header ending in
 #'   either /1 or /2 for read one and two, respectively). If FALSE, headers are
 #'   not changed. Only applicable to paired-end sequence data.
-#'
+#'   
+#' @return Generates files split by barcode in the directory of the R1 file(s),
+#'   named SAMPLENAME_RN.fastq or outfile_prefix_RN_BARCODE.fastq, if provided
+#'   with sample names or not, respectively, where N is A or B (for the reads
+#'   with and without barcodes, respectively). In R, returns a list containing
+#'   the paths to each output file.
+#'   
 #' @export
 #'
 #' @author William Hemstrom
@@ -112,7 +136,9 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
   
   R1 <- normalizePath(R1)
   if(!is.null(R2)){R2 <- normalizePath(R2)}
-
+  
+  dir <- dirname(R1)
+  outfile_prefix <- paste0(dir, "/", outfile_prefix)
   #============execute=======
 
   # run
@@ -128,6 +154,15 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
     cmd <-paste0("perl ", script, " ", R1, " ", paste0(barcodes, collapse = ","), " ", outfile_prefix)
     system(cmd)
   }
+  
+  file_names <- list(RA = paste0(outfile_prefix, "_RA_", barcodes, ".fastq"),
+                     RB = NULL)
+  if(!is.null(R2)){
+    file_names$RB <- paste0(outfile_prefix, "_RB_", barcodes, ".fastq")
+  }
+  else{
+    file_names$RB <- NULL
+  }
 
   # rename
   if(!is.null(sample_names)){
@@ -140,8 +175,16 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
         system(cmdRB)
       }
     }
+    
+    file_names$RA <- paste0(sample_names, "_RA", ".fastq")
+    if(!is.null(R2)){
+      file_names$RB <- paste0(sample_names, "_RB", ".fastq")
+    }
   }
-
+  
+  if(is.null(file_names[[2]])){file_names[[2]] <- NULL}
+  
+  return(file_names)
 }
 
 

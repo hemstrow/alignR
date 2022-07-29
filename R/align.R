@@ -32,6 +32,10 @@
 #'   paired reads reads will be removed using \code{samtools view -f 0x2}. Only
 #'   valid for paired-end reads.
 #' @param par numeric, default 1. Number of cores to use for the alignments.
+#' 
+#' @return Generates 'x.sort.flt.bam' and 'x.sort.flt.bam.bai' files (sorted
+#'   alignments and index files, respectively), where 'x' is the prefix for the
+#'   RA. fastqs. In R, returns a vector of output file paths.
 #'   
 #' @author William Hemstrom
 #' @export
@@ -139,6 +143,8 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 
   # release cores and clean up
   parallel::stopCluster(cl)
+  
+  return_files <- paste0(fastqs$RA, ".sort.flt.bam")
 }
 
 
@@ -193,11 +199,14 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 #'   reads.
 #' @param remove_duplicates logical, default TRUE. Used only if re_align = TRUE,
 #'   passed to \code{align_reference}. If TRUE, PCR duplicates (clones) will be
-#'   removed using \code{samtools markdup}. Only valid for paired-end reads.
+#' removed using \code{samtools markdup}. Only valid for paired-end reads.
 #' @param remove_improper_pairs logical, default FALSE. Used only if re_align =
 #'   TRUE, passed to \code{align_reference}. If TRUE, improperly paired reads
 #'   reads will be removed using \code{samtools view -f 0x2}. Only valid for
 #'   paired-end reads, and should usually be FALSE for denovo alignments.
+#' @param ask_confirmation logical, default TRUE. If TRUE, \code{alignR} will
+#'   ask for confirmation before moving or renaming files. If FALSE,
+#'   \code{alignR} will move or rename without confirmation.
 #'
 #' @return If the \code{stacks_cleanup} arugment is TRUE, catalog.fa and index
 #'   files for the denovo genome in the directory containing the fastq files
@@ -205,7 +214,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 #'   'x.alns.sort.bam.bai' or 'x.sort.flt.bam' and 'x.sort.flt.bam.bai' where
 #'   'x' is the prefix for the RA fastqs, depending on if re-alignment with
 #'   \code{bwa mem} via \code{align_reference} is requested with the
-#'   \code{re_align} argument.
+#'   \code{re_align} argument. In R, returns a vector of output file paths.
 #'   
 #' @author William Hemstrom
 #' @export
@@ -215,7 +224,8 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                          re_align = TRUE,
                          mapQ = 5,
                          remove_duplicates = TRUE, 
-                         remove_improper_pairs = TRUE){
+                         remove_improper_pairs = TRUE,
+                         ask_confirmation = TRUE){
   
   #==========sanity checks==========================
   RA_fastqs <- normalizePath(RA_fastqs)
@@ -297,9 +307,15 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
         cat("stacks expects that each RA/RB pair has a unique prefix and end in .1 or .2. alignR can make a 'renamed' directory at the same location as the original files and copy files here with appropriate names.\n")
         resp <- ""
         while(!resp %in% c("y", "n")){
-          cat("Would you like to copy and rename files? (y/n)\n")
-          resp <- readLines(n = 1)
-          resp <- tolower(resp)
+          if(ask_confirmation){
+            cat("Would you like to copy and rename files? (y/n)\n")
+            resp <- readLines(n = 1)
+            resp <- tolower(resp)
+          }
+          else{
+            resp <- "y"
+          }
+          
         }
         if(resp == "n"){
           stop("stacks expects that each RA/RB pair has a unique prefix.\n")
@@ -429,9 +445,15 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
       cat("stacks expects that each file is zipped (.gz).\n")
       resp <- ""
       while(!resp %in% c("y", "n")){
-        cat("Would you like to gzip files? (y/n)\n")
-        resp <- readLines(n = 1)
-        resp <- tolower(resp)
+        if(ask_confirmation){
+          cat("Would you like to gzip files? (y/n)\n")
+          resp <- readLines(n = 1)
+          resp <- tolower(resp)
+        }
+        else{
+          resp <- "y"
+        }
+        
       }
       if(resp == "n"){
         stop("stacks expects that each file is zipped (.gz).\n")
@@ -479,6 +501,8 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                  ifelse(re_align, "", " --write-alignments"))
   system(gcmd)
   
+  #===========clean-up and post-processing===========
+  
   cat("Cleaning up and renaming if needed.\n")
   if(stacks_cleanup){
     rm.files <- list.files(filepaths[1], "matches\\.tsv.\\gz$", full.names = TRUE)
@@ -505,13 +529,13 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
     system(paste0("gunzip ", file.path(filepaths[1], "catalog.fa.gz")))
     system(paste0("bwa index ", file.path(filepaths[1], "catalog.fa")))
     
-    align_reference(RA_fastqs = RA_fastqs, 
-                    RB_fastqs = RB_fastqs,
-                    reference = file.path(filepaths[1], "catalog.fa"), 
-                    par = par, 
-                    mapQ = mapQ, 
-                    remove_duplicates = remove_duplicates, 
-                    remove_improper_pairs = remove_improper_pairs)
+    return_files <- align_reference(RA_fastqs = RA_fastqs, 
+                                    RB_fastqs = RB_fastqs,
+                                    reference = file.path(filepaths[1], "catalog.fa"), 
+                                    par = par, 
+                                    mapQ = mapQ, 
+                                    remove_duplicates = remove_duplicates, 
+                                    remove_improper_pairs = remove_improper_pairs)
   }
   
   else{
@@ -537,9 +561,12 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
       system(paste0("samtools sort -o ", sort_names[i], " ", new_bamnames[i]))
       system(paste0("samtools index ", sort_names[i]))
     }
+    
+    return_files <- sort_names
   }
   
 
 
   cat("Complete!\n")
+  return(return_files)
 }
