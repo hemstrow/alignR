@@ -54,6 +54,11 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   if(!.check_system_install("bwa")){
     msg <- c(msg, "No bwa install located on system path.\n")
   }
+  
+  
+  if(!.paired_length_check(RA_fastqs, RB_fastqs)){
+    msg <- c(msg, "RA_fastqs and RB_fastqs must be of equal length.\n")
+  }
 
   if(length(msg) > 0){
     stop(msg)
@@ -260,6 +265,10 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
     if(!.check_system_install("bwa")){
       msg <- c(msg, "No bwa install located on system path. This is needed if `re_align` is TRUE.\n")
     }
+  }
+  
+  if(!.paired_length_check(RA_fastqs, RB_fastqs)){
+    msg <- c(msg, "RA_fastqs and RB_fastqs must be of equal length.\n")
   }
   
   if(length(msg) > 0){

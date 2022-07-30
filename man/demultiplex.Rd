@@ -21,7 +21,7 @@ assumes data is single-end.}
 
 \item{barcodes}{character. Vector of barcodes to search for in read files.}
 
-\item{outfile_prefix}{character. prefix to be appended to each resulting
+\item{outfile_prefix}{character. Prefix to be appended to each resulting
 .fastq file.}
 
 \item{sample_names}{character. Vector of names for output files corresponding

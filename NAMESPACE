@@ -3,5 +3,6 @@
 export(align_denovo)
 export(align_reference)
 export(demultiplex)
+export(equalize_read_counts)
 export(genotype_bams)
 export(plate_split)

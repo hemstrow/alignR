@@ -53,6 +53,10 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
   else if(nchar(outfile_prefix) == 0){
     msg <- c(msg, "outfile_prefix cannot be empty ('').\n")
   }
+  
+  if(!.paired_length_check(R1, R2) | !.paired_length_check(R1, R3)){
+    msg <- c(msg, "R1, R2, and R3 must be of equal length.\n")
+  }
 
   if(length(msg) > 0){
     stop(msg)
@@ -101,7 +105,7 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
 #' @param R2 character, default NULL. File name for R2 (read one) file. If NULL,
 #'   assumes data is single-end.
 #' @param barcodes character. Vector of barcodes to search for in read files.
-#' @param outfile_prefix character. prefix to be appended to each resulting
+#' @param outfile_prefix character. Prefix to be appended to each resulting
 #'   .fastq file.
 #' @param sample_names character. Vector of names for output files corresponding
 #'   in order to the provided barcodes. Prefix and barcodes will in names
@@ -128,6 +132,10 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
 
   if(!.check_system_install("perl")){
     msg <- c(msg, "No perl install located on system path.\n")
+  }
+  
+  if(!.paired_length_check(R1, R2)){
+    msg <- c(msg, "R1 and R2 must be of equal length.\n")
   }
 
   if(length(msg) > 0){
