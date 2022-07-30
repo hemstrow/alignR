@@ -157,6 +157,8 @@ genotype_bams <- function(bamfiles,
       if(!.check_system_install("perl")){
         msg <- c(msg, "No perl install located on system path. This is needed if a .vcf file is to be generated from a numeric or NN output.\n")
       }
+      
+      doGeno <- doGeno + 1
     }
   }
   
@@ -178,7 +180,6 @@ genotype_bams <- function(bamfiles,
 
   # save the bamlist
   write(bamfiles, paste0(outfile, "_bamlist.txt"), ncolumns = 1)
-  browser()
 
   # compose command and run
   cmd <- paste0("bash ", script, " ",
@@ -198,7 +199,6 @@ genotype_bams <- function(bamfiles,
 
   system(cmd)
   
-  browser()
   # if returning a vcf, convert and do so
   if(angsd_doVcf){
     system(paste0("bcftools convert -O v -o ", outfile, ".vcf ", outfile, ".bcf"))
@@ -215,10 +215,14 @@ genotype_bams <- function(bamfiles,
   
   if(local_doVcf){ # only TRUE if unzip is TRUE due to sanity checks, so don't need to worry about a zipped input.
     vcf_script <- .fetch_a_script("ConvertGenosToVCF.pl", "perl")
+    tf <- tempfile()
+    write.table(basename(bamfiles), tf, col.names = FALSE, row.names = FALSE, quote = FALSE)
     system(paste0("perl ", vcf_script, " ",
                   paste0(outfile, ".geno"), " ",
                   paste0(outfile, ".vcf"), " ",
-                  ifelse(doGeno == "numeric", "numeric", "NN")))
+                  ifelse(doGeno == 5, "NN ", "numeric "),
+                  tf))
+    file.remove(tf)
     return(paste0(outfile, ".vcf"))
   }
   
