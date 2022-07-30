@@ -26,11 +26,11 @@ smallest .fastq/.fasta file.}
 }
 \value{
 Generates files subset to the specified size. In R, returns a list of
-  RA (and RB if paried-end) file paths to susbet files.
+  RA (and RB if paired-end) file paths to subset files.
 }
 \description{
 Subset out the first n reads of every fastq/fastq file, where n is either the
-smalles number of reads across all samples or user supplied.
+smallest number of reads across all samples or user supplied.
 }
 \author{
 William Hemstrom

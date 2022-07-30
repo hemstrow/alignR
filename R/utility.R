@@ -1,7 +1,7 @@
 #' Equalize the number of reads across multiple fastq or fastq files.
 #'
 #' Subset out the first n reads of every fastq/fastq file, where n is either the
-#' smalles number of reads across all samples or user supplied.
+#' smallest number of reads across all samples or user supplied.
 #'
 #' @param RA_fastqs character. Vector of filepaths for the RA (read one) files.
 #' @param RB_fastqs character or NULL, default NULL. Vector of filepaths for the
@@ -15,8 +15,9 @@
 #' @export
 #' @author William Hemstrom
 #' @return Generates files subset to the specified size. In R, returns a list of
-#'   RA (and RB if paried-end) file paths to susbet files.
-equalize_read_counts <- function(RA_fastqs, RB_fastqs = NULL, nreads = "lowest", outfile_prefix = "subset_"){
+#'   RA (and RB if paired-end) file paths to subset files.
+equalize_read_counts <- function(RA_fastqs, RB_fastqs = NULL, nreads = "lowest",
+                                 outfile_prefix = "subset_"){
   #==========sanity checks============
   RA_fastqs <- normalizePath(RA_fastqs)
   if(!is.null(RB_fastqs)){
