@@ -44,6 +44,17 @@
     packageStartupMessage("SAMtools is good-to-go!\n")
     Sys.setenv(samtools_install = TRUE)
   }
+  
+  # try bcftools
+  bcftools_check <- suppressWarnings(system("bcftools", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(bcftools_check == 127){
+    Sys.setenv(bcftools_install = FALSE)
+    packageStartupMessage("No bcftools installation detected! Some functions will fail.\n")
+  }
+  else{
+    packageStartupMessage("bcftools is good-to-go!\n")
+    Sys.setenv(bcftools_install = TRUE)
+  }
 
   # try angsd
   angsd_check <- suppressWarnings(system("angsd", ignore.stdout = TRUE, ignore.stderr = TRUE))

@@ -18,19 +18,16 @@
 #' @param SNP_pval numeric, default 0.00000001. Minimum p-value that must be met
 #'   \emph{for the probability that a given locus is a SNP} for a locus to be
 #'   genotyped.
-#' @param doGeno character, default "NN". Vector of styles for which genotypes
-#'   will be printed. Options: \itemize{\item{major_minor: } Print the major and
-#'   minor alleles. \item{numeric: } Print alleles as 0, 1, 2, or -1 for the
+#' @param doGeno character, default "NN". Format in which genotypes will be
+#'   printed. Options: \itemize{\item{major_minor: } Print the major and minor
+#'   alleles. \item{numeric: } Print alleles as 0, 1, 2, or -1 for the
 #'   homozygous major, hetoerzygote, homozygous minor, or missing data,
 #'   respectively. \item{NN: } Print alleles as paired nucleotides (AA, AC, CC,
 #'   for example). NN denotes missing data. \item{all_posteriors: } Prints
 #'   posterior probabilities for \emph{all three} genotypes at each locus.
 #'   \item{called_posterior: } Prints the posterior probability for \emph{only
 #'   the called genotype}. \item{binary: } Prints the posterior probabilities
-#'   for the three genotypes \emph{in binary}. This will convert all other
-#'   selected options to binary as well.} If multiple options are selected, they
-#'   \emph{all be printed to a single file}, in the order provided in this
-#'   documentation.
+#'   for the three genotypes \emph{in binary}.}
 #' @param postCutoff numeric, default 0.95. The minimum posterior probability
 #'   required for the most likely genotype for the genotype to be printed at for
 #'   a given individual at a given locus.
@@ -42,6 +39,11 @@
 #'   during genotyping. The default, 20, corresponds to 99\% accuracy.
 #' @param unzip logical, default FALSE. If TRUE, resulting genotype file will be
 #'   unzipped.
+#' @param doVcf logical, default FALSE. If TRUE, create a vcf file. Not
+#'   supported for \code{doGeno = 'major_minor'}. If \code{doGeno} is
+#'   \code{numeric} or \code{NN}, done using an 'in-house' perl script.
+#'   Otherwise done using the \code{-doBcf} option in ANGSD, then converted to a
+#'   .vcf using \code{bcftools}.
 #' @param par numeric, default 1. Number of cores to allow ANGSD to use for
 #'   genotyping.
 #'
@@ -64,6 +66,7 @@ genotype_bams <- function(bamfiles,
                           minQ = 20,
                           minMapQ = 20,
                           unzip = FALSE,
+                          doVcf = FALSE,
                           par = 1){
   #=============sanity checks===================
   msg <- character()
@@ -73,6 +76,9 @@ genotype_bams <- function(bamfiles,
   }
   if(!.check_system_install("angsd")){
     msg <- c(msg, "No angsd install located on system path.\n")
+  }
+  if(!.check_system_install("bcftools") & doGeno %in% c("all_posteriors", "called_posterior", "binary") & doVcf){
+    msg <- c(msg, "No bcftools install located on system path. Needed for genotype posterior .vcf creation.\n")
   }
 
   if(length(msg) > 0){
@@ -118,23 +124,47 @@ genotype_bams <- function(bamfiles,
   }
 
   # figure out doGeno
-  browser()
   doGeno_table <- data.frame(number = c(1, 2, 4, 8, 16, 32),
                              word = c("major_minor", "numeric", "NN", "all_posteriors",
-                                      "called_posterior", "SNP_genotype_posteriors"))
+                                      "called_posterior", "binary"))
   bad_doGeno <- !doGeno %in% doGeno_table[,2]
   if(any(bad_doGeno)){
     msg <- c(msg, paste0("doGeno option(s) ", paste0(doGeno[bad_doGeno], collapse = ", "),
                          " not available. Is this a typo?\n"))
+  }
+  else if(length(doGeno) != 1){
+    msg <- c(msg, "Exactly one doGeno option must be provided.\n")
   }
   else{
     doGeno <- doGeno_table[match(doGeno, doGeno_table[,2]),1]
     doGeno <- sum(doGeno)
   }
 
+  if(doVcf){
+    if(doGeno[1] == 8 | doGeno[1] == 16 | doGeno[1] == 32){
+      angsd_doVcf <- TRUE
+      local_doVcf <- FALSE
+    }
+    else if (doGeno == 1) {
+      msg <- c(msg, "doVcf requires a doGeno option other than 'major_minor'.\n")
+    }
+    else{
+      local_doVcf <- TRUE
+      angsd_doVcf <- FALSE
+      if(isFALSE(unzip)){
+        msg <- c(msg, "'unzip' must be TRUE if a .vcf file is to be generated from a numeric or NN output.\n")
+      }
+      if(!.check_system_install("perl")){
+        msg <- c(msg, "No perl install located on system path. This is needed if a .vcf file is to be generated from a numeric or NN output.\n")
+      }
+    }
+  }
+  
   if(length(msg) > 0){
     stop(msg)
   }
+  
+  
   
   bamfiles <- normalizePath(bamfiles)
   
@@ -148,6 +178,7 @@ genotype_bams <- function(bamfiles,
 
   # save the bamlist
   write(bamfiles, paste0(outfile, "_bamlist.txt"), ncolumns = 1)
+  browser()
 
   # compose command and run
   cmd <- paste0("bash ", script, " ",
@@ -161,16 +192,34 @@ genotype_bams <- function(bamfiles,
                   minQ,
                   minMapQ,
                   outfile,
+                  ifelse(angsd_doVcf, 1, 0),
                   par), collapse = " ")
                 )
 
   system(cmd)
   
-  output_filename <- paste0(outfile, ".geno.gz")
+  browser()
+  # if returning a vcf, convert and do so
+  if(angsd_doVcf){
+    system(paste0("bcftools convert -O v -o ", outfile, ".vcf ", outfile, ".bcf"))
+    output_filename <- paste0(outfile, ".vcf")
+    return(output_filename)
+  }
   
+  output_filename <- paste0(outfile, ".geno.gz")
+
   if(unzip){
     system(paste0("gunzip ", outfile, ".geno.gz"))
     output_filename <- paste0(outfile, ".geno")
+  }
+  
+  if(local_doVcf){ # only TRUE if unzip is TRUE due to sanity checks, so don't need to worry about a zipped input.
+    vcf_script <- .fetch_a_script("ConvertGenosToVCF.pl", "perl")
+    system(paste0("perl ", vcf_script, " ",
+                  paste0(outfile, ".geno"), " ",
+                  paste0(outfile, ".vcf"), " ",
+                  ifelse(doGeno == "numeric", "numeric", "NN")))
+    return(paste0(outfile, ".vcf"))
   }
   
   options(scipen = old.scipen)

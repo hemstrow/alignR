@@ -15,6 +15,7 @@ genotype_bams(
   minQ = 20,
   minMapQ = 20,
   unzip = FALSE,
+  doVcf = FALSE,
   par = 1
 )
 }
@@ -38,19 +39,16 @@ posteriors are either 0, .5, or 1).} See ANGSD documentation for details.}
 \emph{for the probability that a given locus is a SNP} for a locus to be
 genotyped.}
 
-\item{doGeno}{character, default "NN". Vector of styles for which genotypes
-will be printed. Options: \itemize{\item{major_minor: } Print the major and
-minor alleles. \item{numeric: } Print alleles as 0, 1, 2, or -1 for the
+\item{doGeno}{character, default "NN". Format in which genotypes will be
+printed. Options: \itemize{\item{major_minor: } Print the major and minor
+alleles. \item{numeric: } Print alleles as 0, 1, 2, or -1 for the
 homozygous major, hetoerzygote, homozygous minor, or missing data,
 respectively. \item{NN: } Print alleles as paired nucleotides (AA, AC, CC,
 for example). NN denotes missing data. \item{all_posteriors: } Prints
 posterior probabilities for \emph{all three} genotypes at each locus.
 \item{called_posterior: } Prints the posterior probability for \emph{only
 the called genotype}. \item{binary: } Prints the posterior probabilities
-for the three genotypes \emph{in binary}. This will convert all other
-selected options to binary as well.} If multiple options are selected, they
-\emph{all be printed to a single file}, in the order provided in this
-documentation.}
+for the three genotypes \emph{in binary}.}}
 
 \item{postCutoff}{numeric, default 0.95. The minimum posterior probability
 required for the most likely genotype for the genotype to be printed at for
@@ -66,6 +64,12 @@ during genotyping. The default, 20, corresponds to 99\% accuracy.}
 
 \item{unzip}{logical, default FALSE. If TRUE, resulting genotype file will be
 unzipped.}
+
+\item{doVcf}{logical, default FALSE. If TRUE, create a vcf file. Not
+supported for \code{doGeno = 'major_minor'}. If \code{doGeno} is
+\code{numeric} or \code{NN}, done using an 'in-house' perl script.
+Otherwise done using the \code{-doBcf} option in ANGSD, then converted to a
+.vcf using \code{bcftools}.}
 
 \item{par}{numeric, default 1. Number of cores to allow ANGSD to use for
 genotyping.}
