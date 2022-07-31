@@ -26,6 +26,9 @@ equalize_read_counts <- function(RA_fastqs, RB_fastqs = NULL, nreads = "lowest",
   
   msg <- character(0)
   
+  if(!.check_system_install("bash")){
+    msg <- c(msg, "No bash install located on system path.\n")
+  }
   
   exts <- tools::file_ext(c(RA_fastqs, RB_fastqs))
   if(length(unique(exts)) != 1){

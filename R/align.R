@@ -49,7 +49,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
     msg <- c(msg, "No bash install located on system path.\n")
   }
   if(!.check_system_install("samtools")){
-    msg <- c(msg, "No samtools install located on system path.\n")
+    msg <- c(msg, "No SAMtools install located on system path.\n")
   }
   if(!.check_system_install("bwa")){
     msg <- c(msg, "No bwa install located on system path.\n")
@@ -59,7 +59,10 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   if(!.paired_length_check(RA_fastqs, RB_fastqs)){
     msg <- c(msg, "RA_fastqs and RB_fastqs must be of equal length.\n")
   }
-
+  
+  check <- .check_is_genome(reference)
+  if(is.character(check)){msg <- c(msg, check)}
+  
   if(length(msg) > 0){
     stop(msg)
   }

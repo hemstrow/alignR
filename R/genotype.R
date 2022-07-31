@@ -59,7 +59,7 @@
 genotype_bams <- function(bamfiles,
                           outfile_prefix = "genotypes",
                           minInd = floor(length(bamfiles)/2),
-                          genotyper = "SAMtools",
+                          genotyper = "GATK",
                           SNP_pval = 0.00000001,
                           doGeno = "NN",
                           postCutoff = 0.95,
@@ -67,6 +67,12 @@ genotype_bams <- function(bamfiles,
                           minMapQ = 20,
                           unzip = FALSE,
                           doVcf = FALSE,
+                          filter_paralogs = FALSE,
+                          filter_paralogs_alpha = pchisq(10, 1, lower.tail = FALSE),
+                          filter_paralogs_buffer = 1000,
+                          filter_paralogs_populations = rep("only_pop", length(bamfiles)),
+                          filter_paralogs_reference = FALSE,
+                          rf = FALSE,
                           par = 1){
   #=============sanity checks===================
   msg <- character()
@@ -81,6 +87,43 @@ genotype_bams <- function(bamfiles,
     msg <- c(msg, "No bcftools install located on system path. Needed for genotype posterior .vcf creation.\n")
   }
 
+  if(filter_paralogs){
+    
+    if(length(filter_paralogs_populations) != length(bamfiles)){
+      msg <- c(msg, "The length of 'filter_paralogs_populations' must be equal to that of the 'bamfiles'.\n")
+    }
+    pops <- unique(filter_paralogs_populations)
+    
+    if(!.check_system_install("ngsParalog")){
+      msg <- c(msg, "No ngsParalog install located on system path.\n")
+    }
+    if(!.check_system_install("samtools")){
+      msg <- c(msg, "No SAMtools install located on system path.\n")
+    }
+    
+    if(!file.exists(filter_paralogs_reference)){
+      msg <- c(msg, paste0("File not found: ", filter_paralogs_reference, "\n"))
+    }
+    else{
+      check <- .check_is_genome(filter_paralogs_reference)
+      if(is.character(check)){msg <- c(msg, check)}
+      
+    }
+  }
+  
+  if(!isFALSE(rf)){
+    rf <- normalizePath(rf)
+    if(!file.exists(rf)){
+      msg <- c(msg, paste0("Cannot locate file: ", rf, "\n"))
+    }
+  }
+  
+  bamfiles <- normalizePath(bamfiles)
+  bad_bams <- which(!file.exists(bamfiles))
+  if(length(bad_bams) != 0){
+    msg <- c(msg, paste0("Cannot locate bamfiles: ", paste0(bad_bams, collapse = ", "), "\n"))
+  }
+  
   if(length(msg) > 0){
     stop(msg)
   }
@@ -109,18 +152,9 @@ genotype_bams <- function(bamfiles,
 
 
   # figure out genotyper code
-  genotyper_table <- data.frame(matrix(c(1, "SAMtools",
-                                         2, "GATK",
-                                         3, "SOAPsnp",
-                                         4, "SYK",
-                                         5, "phys",
-                                         6, "sample"),
-                                       ncol = 2, byrow = TRUE))
-  if(!genotyper %in% genotyper_table[,2]){
-    msg <- c(msg, paste0("Genotyper ", genotyper, " not available. Is this a typo?\n"))
-  }
-  else{
-    genotyper <- genotyper_table[match(genotyper, genotyper_table[,2]),1]
+  genotyper <- .angsd_genotyper_key(genotyper)
+  if(!is.numeric(genotyper)){
+    msg <- c(msg, genotyper)
   }
 
   # figure out doGeno
@@ -162,14 +196,14 @@ genotype_bams <- function(bamfiles,
     }
   }
   
+  browser()
   if(length(msg) > 0){
     stop(msg)
   }
   
   
   
-  bamfiles <- normalizePath(bamfiles)
-  
+
   dir <- dirname(bamfiles[1])
   outfile <- file.path(dir, outfile_prefix)
 
@@ -177,6 +211,23 @@ genotype_bams <- function(bamfiles,
   old.scipen <- options("scipen")
   options(scipen = 999)
   script <- .fetch_a_script("angsd_genotypes.sh", "shell")
+  
+  # filter paralogs if requested
+  if(filter_paralogs){
+    rf <- .filter_paralogs(bamfiles = bamfiles, 
+                           populations = filter_paralogs_populations,
+                           outfile = "selected_clean_regions.txt",
+                           buffer = filter_paralogs_buffer, 
+                           alpha = filter_paralogs_alpha,
+                           reference = filter_paralogs_reference, 
+                           genotyper = genotyper, 
+                           SNP_pval = SNP_pval, 
+                           minQ = minQ, 
+                           minMapQ = minMapQ,
+                           cleanup = TRUE,
+                           rf = rf,
+                           par = par)
+  }
 
   # save the bamlist
   write(bamfiles, paste0(outfile, "_bamlist.txt"), ncolumns = 1)
@@ -194,6 +245,8 @@ genotype_bams <- function(bamfiles,
                   minMapQ,
                   outfile,
                   ifelse(angsd_doVcf, 1, 0),
+                  ifelse(file.exists(rf), 1, 0),
+                  ifelse(file.exists(rf), rf, "NA"),
                   par), collapse = " ")
                 )
 

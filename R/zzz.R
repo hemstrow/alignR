@@ -79,6 +79,17 @@
     Sys.setenv(bwa_install = TRUE)
   }
   
+  # try ngsParalog
+  ngsParalog_check <- suppressWarnings(system("ngsParalog", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(ngsParalog_check == 127){
+    Sys.setenv(ngsParalog_install = FALSE)
+    packageStartupMessage("No ngsParalog installation detected! The 'filter_paralogs' function will fail.\n")
+  }
+  else{
+    packageStartupMessage("ngsParalog is good-to-go!\n")
+    Sys.setenv(ngsParalog_install = TRUE)
+  }
+  
   # try stacks
   stacks_check <- suppressWarnings(system("stacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
   stacks_check2 <- suppressWarnings(system("cstacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
