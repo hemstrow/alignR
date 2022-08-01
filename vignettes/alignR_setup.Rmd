@@ -79,7 +79,7 @@ sudo rstudio-server stop
 
 If you need to start your Rstudio server back up in the future, you can do so by running `sudo rstudio-server start` from your Ubuntu prompt again.
 
-# Installing alignR
+# Installing alignR on Linux, Windows, or Mac
 
 From your Rstudio session, install the remotes package:
 
@@ -109,8 +109,6 @@ We will install all of our dependencies using the *terminal*, not the R console.
 
 ### bash and perl
 
-
-
 Any Linux distro will definitely have bash installed, and very likely have perl installed as well. If you don't have perl, you can install it by running:
 
 ```{bash}
@@ -130,7 +128,7 @@ to fetch your perl version.
 For most Linux distros (including the default Ubuntu distro installed via WSL), you can install SAMtools easily. First, update your apt library using:
 
 ```{bash}
- sudo apt-get update
+sudo apt-get update
 ```
 
 then, install SAMtools with:
@@ -184,10 +182,21 @@ ANGSD is a bit trickier to install, since it can't be installed with `apt get-in
 sudo apt-get install make gcc g++ libz-dev liblzma-dev libbz2-dev libcurl-dev libcurl4-openssl-dev
 ```
 
-Next, we can follow the instructions [here](http://www.popgen.dk/angsd/index.php/Installation):
+Next, we can follow the instructions [here](http://www.popgen.dk/angsd/index.php/Installation). First, download the ANGSD tarball via:
 
 ```{bash}
 wget http://popgen.dk/software/download/angsd/angsd0.938.tar.gz
+```
+on Linux, or
+
+```{bash}
+curl -o angsd.tar.gz http://popgen.dk/software/download/angsd/angsd0.938.tar.gz
+```
+
+on Mac.
+
+Next, we install it:
+```{bash}
 tar xf angsd0.938.tar.gz
 cd htslib;make;cd ..
 cd angsd
@@ -201,7 +210,75 @@ The actual executable we need is at `angsd/angsd`. This executable needs to be o
 sudo cp ./angsd/angsd /usr/bin/
 ```
 
+On a Mac, this may not work since `/usr/bin` is often tightly protected. Instead, we can move the executable to `/usr/local/bin`:
+
+```{bash}
+sudo cp ./angsd/angsd /usr/local/bin/
+```
+
 Note that the ANGSD install will leave a few relics in your working directory that you can remove if you so desire.
+
+### stacks
+alignR only needs `stacks` installed if you plan to do denovo reference assembly!
+
+On a Derbian like linux install, we can use `apt-get` to install `stacks`.
+
+```{bash}
+sudo apt-get install stacks
+```
+
+On a Mac, stacks may not be available via `brew`. Instead, we need to install it manually.
+
+Go to [the stacks website](https://catchenlab.life.illinois.edu/stacks/) and download the latest version of the stacks tarball (or, alternatively, copy the link to the tarball and download it with `curl` as when installing ANGSD).
+
+Next, unzip the download and move into the new directory (the name may vary depending on the version):
+
+```{bash}
+tar xf stacks-2.62.tar.gz
+cd stacks-2.62
+```
+
+There are installation instructions here in the `README`. First, configure and make the file. You can set a custom install location by changing the `--prefix=/dir/on/my/path` argument. Here, we'll do `--perfix=/usr/local/bin` (which is also the default install location).
+
+THIS CURRENTLY DOESN'T WORK, WE GET AN ERROR AT MAKE.
+
+```{bash}
+./configure --prefix=/usr/local/bin
+make
+```
+
+Lastly, we then install stacks:
+
+```{bash}
+sudo make install
+```
+
+## bcftools
+alignR only needs bcftools if you need to make VCF files *with genotype posteriors* using `genotype_bams()`. Making VCF files from called genotypes is supported internally.
+
+On Linux:
+```{bash}
+sudo apt-get install bcftools
+```
+
+On Mac:
+```{bash}
+brew install bcftools
+```
+
+## ngsParalog
+alignR only needs ngsParalog if you are planning to do paralog filtering during genotype calling with `genotype_bams()`. Current versions of `ngsParalog` unfortunately are failing to compile on most systems (hopefully this will be fixed soon!). For now, a compiled version can be downloaded from X. After downloading, move the file to somewhere on your system `$PATH`:
+
+On Linux:
+```{bash}
+sudo mv ngsParalog /usr/bin
+```
+
+On Mac:
+```{bash}
+mv ngsParalog /usr/local/bin
+```
+
 
 ## Wrap-up
 
