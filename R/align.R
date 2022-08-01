@@ -102,7 +102,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   
   
   
-  if(!is.null(RB)){
+  if(!is.null(RB_fastqs)){
     is_single <- FALSE
     script <- .fetch_a_script("run_align.sh", "shell")
     
@@ -180,8 +180,6 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 #' @param RA_fastqs character. Vector of filepaths for the RA (read one) files.
 #' @param RB_fastqs character or NULL, default NULL. Vector of filepaths for the
 #'   RB (read one) files.
-#' @param reference character. Filepath for the reference genome to use for the
-#'   alignment.
 #' @param M numeric. The \code{-M} parameter from STACKS, the "number of
 #'   mismatches allowed between stacks within individuals" (see STACKS
 #'   documentation).
@@ -364,7 +362,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
           colnames(map)[5:6] <- c("RA_renamed", "RB_renamed")
           
           rename_key <- map[,c("RA", "RB", "header", "RA_renamed", "RB_renamed")]
-          write.table(rename_key, paste0(filepaths[1], "/rename_key.txt"), col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
+          utils::write.table(rename_key, paste0(filepaths[1], "/rename_key.txt"), col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
           cat("Renaming successfull. Key for renamed files located at", paste0(filepaths[1], "/rename_key.txt"), "\n\tNote that resulting bam files will be renamed back to their original RA prefixes!\n")
           
           filepaths <- rep(new_dir, length(filepaths))
@@ -428,11 +426,11 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
   if(check_headers & !is.null(RB_fastqs)){
     cat("Checking and fixing any unrecognized headers in .fastq files.\nProgress:\t")
     
-    rstrings <- stringi::stri_rand_strings(length(c(RA_fastqs, RB_fastqs)), length(c(RA_fastqs, RB_fastqs))*10)
+    rstrings <- .rand_strings(length(c(RA_fastqs, RB_fastqs)), length(c(RA_fastqs, RB_fastqs))*10)
     bad_rstrings <- file.exists(file.path(filepaths[1], rstrings))
     
     while(any(bad_rstrings)){
-      rstrings[bad_rstrings] <- stringi::stri_rand_strings(sum(bad_rstrings), length(c(RA_fastqs, RB_fastqs))*10)
+      rstrings[bad_rstrings] <- .rand_strings(sum(bad_rstrings), length(c(RA_fastqs, RB_fastqs))*10)
       bad_rstrings <- file.exists(file.path(filepaths[1], rstrings))
     }
     
@@ -490,7 +488,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
     }
   }
   
-  write.table(popmap, "./alignR_popmap", quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
+  utils::write.table(popmap, "./alignR_popmap", quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
   #===========run stacks=====================
   script <- .fetch_a_script("denovo_map_edit.pl", "perl")
   

@@ -300,7 +300,7 @@ genotype_bams <- function(bamfiles,
   if(local_doVcf){ # only TRUE if unzip is TRUE due to sanity checks, so don't need to worry about a zipped input.
     vcf_script <- .fetch_a_script("ConvertGenosToVCF.pl", "perl")
     tf <- tempfile()
-    write.table(basename(bamfiles), tf, col.names = FALSE, row.names = FALSE, quote = FALSE)
+    utils::write.table(basename(bamfiles), tf, col.names = FALSE, row.names = FALSE, quote = FALSE)
     system(paste0("perl ", vcf_script, " ",
                   paste0(outfile, ".geno"), " ",
                   paste0(outfile, ".vcf"), " ",

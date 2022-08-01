@@ -1,0 +1,2 @@
+#'@importFrom foreach %dopar%
+NULL

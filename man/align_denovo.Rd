@@ -67,9 +67,6 @@ paired-end reads, and should usually be FALSE for denovo alignments.}
 \item{ask_confirmation}{logical, default TRUE. If TRUE, \code{alignR} will
 ask for confirmation before moving or renaming files. If FALSE,
 \code{alignR} will move or rename without confirmation.}
-
-\item{reference}{character. Filepath for the reference genome to use for the
-alignment.}
 }
 \value{
 If the \code{stacks_cleanup} arugment is TRUE, catalog.fa and index

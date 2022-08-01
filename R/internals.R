@@ -46,7 +46,7 @@
                              minQ = 20,
                              minMapQ = 20,
                              buffer = 1000,
-                             alpha = pchisq(10, 1, lower.tail = FALSE),
+                             alpha = stats::pchisq(10, 1, lower.tail = FALSE),
                              par = 1,
                              rf = rf,
                              cleanup = TRUE){
@@ -64,7 +64,7 @@
   #=========prep bamlists==============
   bamlists <- paste0(pops, "_bamlist")
   for(i in 1:length(pops)){
-    write.table(bamfiles[which(populations == pops[i])], bamlists[i], quote = F, row.names = FALSE, col.names = FALSE)
+    utils::write.table(bamfiles[which(populations == pops[i])], bamlists[i], quote = F, row.names = FALSE, col.names = FALSE)
   }
   
   #========single pop function============================
@@ -123,7 +123,7 @@
   
   # save
   outfile <- file.path(dirname(bamfiles[1]), outfile)
-  write.table(data.frame(p = g.list), file = outfile, col.names = F, row.names = F, quote = F)
+  utils::write.table(data.frame(p = g.list), file = outfile, col.names = F, row.names = F, quote = F)
   
   # cleanup
   if(cleanup){
@@ -140,17 +140,19 @@
 }
 
 .find_non_paralogous_sections <- function(flist, unique_chromsome_file, base_pair_buffer, alpha, existing_rf = FALSE){
+  
+  chr <- position <- NULL
 
   dat <- vector("list", length(flist))
   for(i in 1:length(dat)){
-    dat[[i]] <- read.table(flist[i], header = FALSE)
+    dat[[i]] <- utils::read.table(flist[i], header = FALSE)
   }
   dat <- dplyr::bind_rows(dat)
 
   
   #====================prepare paralog list=====================
   # filter to likely paralogs
-  dat[,5] <- pchisq(dat[,5], 1, lower.tail = FALSE)
+  dat[,5] <- stats::pchisq(dat[,5], 1, lower.tail = FALSE)
   
   paralog_list <- dat[which(dat[,5] <= alpha), 1:2]
   rm(dat)
@@ -161,7 +163,7 @@
   
   # now need to highlight the regions to run. These exclude each site within 1kb of a paralog (basically the tag)
   # to do so, loop through each possible chr and find the acceptable regions
-  chr_opts <- read.table(unique_chromsome_file, header = F, stringsAsFactors = F)
+  chr_opts <- utils::read.table(unique_chromsome_file, header = F, stringsAsFactors = F)
   chr_lengths <- chr_opts[,2]
   chr_opts <- chr_opts[,1]
   chr_opts <- gsub(">", "", chr_opts)
@@ -329,4 +331,13 @@
   }
   
   return(write.sections)
+}
+
+
+.rand_strings <- function(n, length){
+  chrs <- sample(c(LETTERS, letters, 1:9), n*length, replace = TRUE)
+  chrs <- split(chrs, rep(1:n, length.out = n*length))
+  chrs <- unlist(lapply(chrs, function(x) paste0(x, collapse = "")))
+  chrs <- as.character(chrs)
+  return(chrs)
 }
