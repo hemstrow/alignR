@@ -50,7 +50,6 @@
                              par = 1,
                              rf = rf,
                              cleanup = TRUE){
-  browser()
   
   #==========setup==============
   pops <- unique(populations)
@@ -141,7 +140,6 @@
 }
 
 .find_non_paralogous_sections <- function(flist, unique_chromsome_file, base_pair_buffer, alpha, existing_rf = FALSE){
-  browser()
 
   dat <- vector("list", length(flist))
   for(i in 1:length(dat)){
@@ -172,25 +170,39 @@
   if(!isFALSE(existing_rf)){
     rf <- readLines(existing_rf)
     rf_chrs <- gsub(":.+$", "", rf)
-    rf_chrs <- gsub(":$", "", rf)
+    rf_chrs <- gsub(":$", "", rf_chrs)
     rf_pos <- gsub("^.+:", "", rf)
     rf_start <- gsub("-.+$", "", rf_pos)
     rf_end <- gsub("^.+-", "", rf_pos)
     rf_start <- gsub("-", "", rf_start)
     rf_end <- gsub("-", "", rf_end)
-    chr_opts <- chr_opts[which(chr_opts %in% rf_chrs)] # no reason to even look at any chrs that are entirely excluded based on rf file.
-    
     rf <- data.frame(chr = rf_chrs, start = rf_start, end = rf_end)
+    
+    need_starts <- which(rf$start == "")
+    rf$start[need_starts] <- chr_lengths[match(rf$chr[need_starts], chr_opts)]
+    need_ends <- which(rf$end == "")
+    rf$end[need_ends] <- chr_lengths[match(rf$chr[need_ends], chr_opts)]
+    rf$start <- as.numeric(rf$start)
+    rf$end <- as.numeric(rf$end)
+    
+    
+    keep_chrs <- which(chr_opts %in% rf_chrs)
+    chr_opts <- chr_opts[keep_chrs] # no reason to even look at any chrs that are entirely excluded based on rf file.
+    chr_lengths <- chr_lengths[keep_chrs]
+    
+    
     
   }
   
-  # loop through each possible chromosome, building a series of arguments listing "ok" sites
-  good.sections <- character(0)
+  #======================loop through each possible chromosome, building a series of arguments listing "ok" sites=================
+  good.sections <- list(chr = character(), start = numeric(), end = numeric())
   for(i in 1:length(chr_opts)){
     
     # if this chr is all good, note and skip
     if(!chr_opts[i] %in% paralog_list$chr){
-      good.sections <- c(good.sections, paste0(chr_opts[i], ":1-"))
+      good.sections$chr <- c(good.sections$chr, chr_opts[i])
+      good.sections$start <- c(good.sections$start, 1)
+      good.sections$end <- c(good.sections$end, chr_lengths[i])
       next
     }
     
@@ -207,9 +219,10 @@
       if(j == length(t.chr.bads)){
         # as long as there are actually more bps in the chr, note that everything else is good
         if(chr_lengths[i] >= t.chr.bads[j] + base_pair_buffer + 1){
-          else{
-            good.sections <- c(good.sections, paste0(chr_opts[i], ":", t.chr.bads[j] + base_pair_buffer + 1, "-"))
-          }
+          
+          good.sections$chr <- c(good.sections$chr, chr_opts[i])
+          good.sections$start <- c(good.sections$start, t.chr.bads[j] + base_pair_buffer + 1)
+          good.sections$end <- c(good.sections$end, chr_lengths[i])
         }
         next
       }
@@ -217,7 +230,9 @@
       # if this bad window start is greater than the previous bad window end, time to print a new good section (unless there is a perfect overlap!)
       if(t.chr.bads[j] - base_pair_buffer > b.end){
         if(g.start < t.chr.bads[j] - base_pair_buffer - 1){
-          good.sections <- c(good.sections, paste0(chr_opts[i], ":", g.start, "-", t.chr.bads[j] - base_pair_buffer - 1))
+          good.sections$chr <- c(good.sections$chr, chr_opts[i])
+          good.sections$start <- c(good.sections$start, g.start)
+          good.sections$end <- c(good.sections$end, t.chr.bads[j] - base_pair_buffer - 1)
         }
         g.start <- t.chr.bads[j] + base_pair_buffer + 1
         b.end <- t.chr.bads[j] + base_pair_buffer
@@ -232,14 +247,86 @@
     }
   }
   
-  browser()
-  # harmonize with the existing RF
+  #===================harmonize with the existing RF (if provided) via looping through smaller rf================
+  # skip everything else if no existing rf to mesh with
+  if(isFALSE(existing_rf)){
+    return(paste0(good.sections$chr, ":", good.sections$start, "-", good.sections$end))
+  }
   
-  # remove windows outside of existing rf regions
+  cat("Merging accepted regions (only regions ID'd as being both non-paralogs and in the provided .rf file accepted).\n This may take a few minutes.\nProgress:\n")
+  good.sections <- as.data.frame(good.sections)
   
-  # truncate windows that are partially inside existing rf regions
+  # figure out which rf is smaller (quicker to loop through, since the n*p part is vectorized)
+  if(nrow(good.sections) < nrow(rf)){
+    rf1 <- good.sections
+    rf2 <- rf
+  }
+  else{
+    rf1 <- rf
+    rf2 <- good.sections
+  }
+  rm(rf, good.sections)
   
-  # leave other windows intact
+  # loop through each chr, then each region in rf1 to do the comparisons and save the results.
+  prog <- 0
+  next_completion <- 5
+  write.sections <- character()
+  for(i in 1:length(chr_opts)){
+    rf2.consider <- which(rf2$chr == chr_opts[i])
+    rf1.consider <- which(rf1$chr == chr_opts[i])
+    for(j in 1:length(rf1.consider)){
+      prog <- prog + 1
+      current_completion <- (prog/nrow(rf1)) * 100
+      if(current_completion > next_completion){
+        cat(paste0("\t", floor(current_completion), "%\n"))
+        next_completion <- next_completion + 5
+      }
+      
+      # these logicals are all <=, since = means we include that bp. Had to plot this shit out.
+      l1 <- rf1[rf1.consider[j],]$start <= rf2[rf2.consider,]$start # rf1 start before rf2 start?
+      l2 <- rf1[rf1.consider[j],]$start <= rf2[rf2.consider,]$end # rf1 start before rf2 end?
+      l3 <- rf1[rf1.consider[j],]$end <= rf2[rf2.consider,]$start # rf1 end before rf2 start?
+      l4 <- rf1[rf1.consider[j],]$end <= rf2[rf2.consider,]$end # rf1 end before rf2 end?
+      
+      # if the r1 section is entirely within an rf2 region, keep the whole r1 and move on
+      r1_within_r2 <- which(!l1 & l2 & !l3 & l4)
+      if(length(r1_within_r2) != 0){
+        write.sections <- c(write.sections, paste0(chr_opts[i], ":", 
+                                                   rf1[rf1.consider[j],]$start,
+                                                   rf1[rf1.consider[j],]$end))
+        next # can move on, since if this is ever true none of the others can be, and all of the other rf2 regions are rejected.
+      }
+      
+
+      # keep whichever r2 sections are completely inside r1
+      r2_within_r1 <- which(l1 & l2 & !l3 & !l4)
+      if(length(r2_within_r1) > 0){
+        write.sections <- c(write.sections, paste0(chr_opts[i], ":",
+                                                   rf2[rf2.consider[r2_within_r1],]$start, "-",
+                                                   rf2[rf2.consider[r2_within_r1],]$end))
+      }
+      
+      # truncate where r1 overhangs to the left of r2
+      r1_left_truncate <- which(l1 & l2 & !l3 & l4)
+      if(length(r1_left_truncate) != 0){
+        write.sections <- c(write.sections, paste0(chr_opts[i], ":",
+                                                   rf2[rf2.consider[r1_left_truncate],]$start, "-",
+                                                   rf1[rf1.consider[j],]$end))
+      }
+      
+      # truncate where r1 overhangs to the right of r2
+      r1_right_truncate <- which(!l1 & l2 & !l3 & !l4)
+      if(length(r1_right_truncate)){
+        write.sections <- c(write.sections, paste0(chr_opts[i], ":",
+                                                   rf1[rf1.consider[j],]$start, "-",
+                                                   rf2[rf2.consider[r1_right_truncate],]$end))
+      }
+      
+      # TTTT and FFFF have no overlap, don't need to write anything
+    }
+    
+    
+  }
   
-  return(good.sections)
+  return(write.sections)
 }

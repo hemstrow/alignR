@@ -11,7 +11,7 @@
 #' @param minInd numeric, default \code{floor(length(bamfiles)/2)}. Minimum
 #'   number of individuals a locus must be sequenced in in order to call
 #'   genotypes.
-#' @param genotyper character, default "SAMtools". Name of the genotyper to use.
+#' @param genotyper character, default "GATK". Name of the genotyper to use.
 #'   Options: \itemize{\item{SAMtools} \item{GATK} \item{SOAPsnp} \item{phys}
 #'   \item{sample: } randomly sample reads to make the genotypes (therefore
 #'   posteriors are either 0, .5, or 1).} See ANGSD documentation for details.
@@ -44,9 +44,37 @@
 #'   \code{numeric} or \code{NN}, done using an 'in-house' perl script.
 #'   Otherwise done using the \code{-doBcf} option in ANGSD, then converted to a
 #'   .vcf using \code{bcftools}.
+#' @param filter_paralogs logical, default FALSE. If true \code{ngsParalogs}
+#'   will be used to detect and remove paralogs prior to genotype calling.
+#' @param filter_paralogs_alpha numeric, default 0.0016. Sites with p-values
+#'   below this will be considered paralogs if \code{filter_paralogs} is TRUE.
+#'   The default corresponds to a likelihood ratio score of roughly 10.
+#' @param filter_paralogs_buffer numeric, default 1000. Sites within this many
+#'   bp of and candidate paralog sites will be excluded during genotyping if
+#'   \code{filter_paralogs} is TRUE.
+#' @param filter_paralogs_populations character, default rep("only_pop",
+#'   length(bamfiles)). Vector of population names for each input bamfile for
+#'   use during paralog filtering. Loci will be considered candidate paralogs if
+#'   they are below \code{filter_paralogs_alpha} in any population.
+#' @param filter_paralogs_reference character, default FALSE. If
+#'   \code{filter_paralogs} is TRUE, a reference genome is needed for the
+#'   creation of the target region .rf file needed by \code{SAMtools}.
+#' @param rf logical, default FALSE. If TRUE, a path target region (.rf) file
+#'   containing genomic regions where loci will be sequenced. An rf file can be
+#'   supplied while still doing paralog filtering with if \code{filter_paralogs}
+#'   is TRUE, in which case only loci from both non-paralog regions and noted in
+#'   the rf file will be genotyped. Format: one region per line, noted by
+#'   'chrname:start-end'. The ending position can be omitted if the rest of the
+#'   remaining chromosome is a target region ('chr1:4124-' would keep every site
+#'   after position 4123). A single base can be specified using 'chrname:bp-bp'
+#'   (for example, 'chr1:4124-4124 would sequence only position 4124 on chr1).
+#'   Multiple regions per chromosome are acceptable. An entire chromosome can be
+#'   targeted by either omitting both the start and end or by noting both the
+#'   first and last bp ('chr1:1-', 'chr1:', and 'chr1:1-10000' would all include
+#'   the entire chr1 if it is 10000 bp long).
 #' @param par numeric, default 1. Number of cores to allow ANGSD to use for
 #'   genotyping.
-#'
+#'   
 #' @return Generates genotype files in the requested format named
 #'   outfile_prefix.geno(.gz) in the directory of the first bamfile. The file
 #'   will be zipped (.gz) if \code{unzip} is not TRUE. In R, returns file path
@@ -68,7 +96,7 @@ genotype_bams <- function(bamfiles,
                           unzip = FALSE,
                           doVcf = FALSE,
                           filter_paralogs = FALSE,
-                          filter_paralogs_alpha = pchisq(10, 1, lower.tail = FALSE),
+                          filter_paralogs_alpha = 0.0016,
                           filter_paralogs_buffer = 1000,
                           filter_paralogs_populations = rep("only_pop", length(bamfiles)),
                           filter_paralogs_reference = FALSE,
@@ -195,8 +223,11 @@ genotype_bams <- function(bamfiles,
       doGeno <- doGeno + 1
     }
   }
+  else{
+    angsd_doVcf <- FALSE
+    local_doVcf <- FALSE
+  }
   
-  browser()
   if(length(msg) > 0){
     stop(msg)
   }
