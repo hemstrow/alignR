@@ -1,2 +1,10 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^README\.Rmd$
+^cran-comments\.md$
+^NEWS\.md
+^\.github$
+^\.covrignore$
+^codecov\.yml$
+^inst\shiny*$
+^LICENSE
