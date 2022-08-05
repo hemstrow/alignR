@@ -16,7 +16,7 @@
   perl_check <- suppressWarnings(system("perl -v", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(perl_check == 127){
     Sys.setenv(perl_install = FALSE)
-    warning(paste0("No perl installation detected! Some functions will fail:\n", 
+    warning(paste0("No perl installation detected! Some functions will fail:\n\t", 
                    paste0(unlist(.dependency_function_match("perl")), collapse = "\n\t"),
                    "\n"))
   }
@@ -40,7 +40,7 @@
   samtools_check <- suppressWarnings(system("samtools", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(samtools_check == 127){
     Sys.setenv(samtools_install = FALSE)
-    packageStartupMessage(paste0("No SAMtools installation detected! Some functions will fail:\n", 
+    packageStartupMessage(paste0("No SAMtools installation detected! Some functions will fail:\n\t", 
                                  paste0(unlist(.dependency_function_match("samtools")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -53,7 +53,7 @@
   bcftools_check <- suppressWarnings(system("bcftools", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(bcftools_check == 127){
     Sys.setenv(bcftools_install = FALSE)
-    packageStartupMessage(paste0("No bcftools installation detected! Some functions will fail:\n", 
+    packageStartupMessage(paste0("No bcftools installation detected! Some functions will fail:\n\t", 
                                  paste0(unlist(.dependency_function_match("bcftools")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -66,7 +66,7 @@
   angsd_check <- suppressWarnings(system("angsd", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(angsd_check == 127){
     Sys.setenv(angsd_install = FALSE)
-    packageStartupMessage(paste0("No angsd installation detected! Some functions will fail:\n", 
+    packageStartupMessage(paste0("No angsd installation detected! Some functions will fail:\n\t", 
                                  paste0(unlist(.dependency_function_match("angsd")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -80,7 +80,7 @@
   bwa_check <- suppressWarnings(system("bwa", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(bwa_check == 127){
     Sys.setenv(bwa_install = FALSE)
-    packageStartupMessage(paste0("No bwa installation detected! Some functions will fail:\n", 
+    packageStartupMessage(paste0("No bwa installation detected! Some functions will fail:\n\t", 
                                  paste0(unlist(.dependency_function_match("bwa")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -93,7 +93,7 @@
   ngsParalog_check <- suppressWarnings(system("ngsParalog", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(ngsParalog_check == 127){
     Sys.setenv(ngsParalog_install = FALSE)
-    packageStartupMessage(paste0("No ngsParalog installation detected! Some functions will fail:\n", 
+    packageStartupMessage(paste0("No ngsParalog installation detected! Some functions will fail:\n\t", 
                                  paste0(unlist(.dependency_function_match("ngsParalog")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -111,7 +111,7 @@
   }
   else{
     Sys.setenv(stacks_install = FALSE)
-    packageStartupMessage(paste0("No STACKS installation detected! Some functions will fail:\n", 
+    packageStartupMessage(paste0("No STACKS installation detected! Some functions will fail:\n\t", 
                                  paste0(unlist(.dependency_function_match("stacks")), collapse = "\n\t"),
                                  "\n"))
   }
