@@ -51,8 +51,10 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
   #==========read in input files===========
-  x <- reactiveValues(files = list(), files_report = list(), files_are_good = 0)
-  x$files_are_good <- 0
+  x <- reactiveValues(files = list(), files_report = list(), 
+                      files_are_good = 0, have_sample_ids = 0,
+                      x$demultiplexed_files = list()
+                      x$demultiplexed = 0)
   
   # generate image
   barcode.type <- eventReactive(input$barcodes,{
@@ -168,7 +170,11 @@ server <- function(input, output, session) {
   shinyFileChoose(input, 'barcode_file_1', root=c(root))
   shinyFileChoose(input, 'barcode_file_2', root=c(root))
   
-  observeEvent(input$barcodes, {
+  # reset if the input type changes!
+  observeEvent(input$barcodes, ignoreInit = TRUE, {
+    x$files_are_good <- 0
+  })
+  observeEvent(input$is.paired, ignoreInit = TRUE, {
     x$files_are_good <- 0
   })
   
@@ -288,7 +294,6 @@ server <- function(input, output, session) {
       x$files_report <- .fastq_file_reporter(x$files)
       
       
-      
       shinyjs::show("barcode_files_report")
       shinyjs::show("fastq_files_report")
       shinyjs::show("sample_ids")
@@ -304,11 +309,48 @@ server <- function(input, output, session) {
     }
   })
   shinyFileChoose(input, 'sample_ids', root=c(root))
-  
-  
-  
-  #==================filter_data==============================
 
+  observeEvent(input$sample_ids,{
+    x$files$sample_ids <- .parse_shinyFiles_path(root, input$sample_ids)
+    x$have_sample_ids <- 1
+  })
+  
+  #=============run demultiplexing======================
+  observeEvent(input$go_demultiplex,{
+    if(x$files_are_good){
+      if("Seperate fastq File" %in% input$barcodes){
+        x$files$plate_split_files <- plate_split(R1 = readLines(x$files$R1), 
+                                                 R2 = ifelse(input$is.paired, readLines(x$files$R2), NULL),
+                                                 R3 = readLines(x$files$R3), 
+                                                 indices = ifelse(length(input$barcodes) > 1, 
+                                                                  readLines(x$files$barcode_file_2), 
+                                                                  readLines(x$barcode_file_1)),
+                                                 outfile_prefix = "alignR_gui_plate_split")
+        if(length(input$barcodes) == 1){
+          x$files$demultiplexed_files <- x$files$plate_split_files
+          x$files$plate_split_files <- NULL
+        }
+      }
+      
+      if(any(c("In Headers", "Start of Reads") %in% input$barcodes)){
+        x$files$demultiplexed_files <- demultiplex(R1 = ifelse("Seperate fastq File" %in% input$barcodes,
+                                                               x$files$plate_split_files$R1,
+                                                               readLines(x$files$R1)),
+                                                   R2 = ifelse(input$is.paired,
+                                                               ifelse("Seperate fastq File" %in% input$barcodes,
+                                                                      x$files$plate_split_files$R3,
+                                                                      readLines(x$files$R3)),
+                                                               NULL),
+                                                   sample_names = ifelse(x$have_sample_ids,
+                                                                         readLines(x$files$sample_ids),
+                                                                         NULL),
+                                                   barcodes = readLines(x$files$barcode_file_1))
+      }
+      
+      x$demultiplexed <- 1
+    }
+  })
+  
 } 
 
 shinyApp(ui, server)
