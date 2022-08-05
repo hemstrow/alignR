@@ -16,6 +16,7 @@ Imports:
     doParallel,
     dplyr,
     parallel,
+    purrr,
     stats,
     utils
 Depends:
