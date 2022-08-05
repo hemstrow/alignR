@@ -341,3 +341,18 @@
   chrs <- as.character(chrs)
   return(chrs)
 }
+
+
+
+.dependency_function_match <- function(dependancies){
+  dep_tab <- list(bash = c("all"),
+                  perl = c("align_denovo", "plate_split", "demultiplex", "genotype_bams with doVcf = TRUE and doGeno = 'NN' or 'numeric'."),
+                  stacks = c("align_denovo"),
+                  bcftools = c("genotype_bams with doVcf and doGeno other than 'NN' or 'numeric'"),
+                  ngsParalog = c("genotype_bams with filter_paralogs = TRUE"),
+                  angsd = c("genotype_bams"),
+                  samtools = c("align_reference", "align_denovo", "genotype_bams"),
+                  bwa = c("align_reference", "align_denovo with re_align = TRUE"))
+  
+  return(dep_tab[names(dep_tab) %in% dependancies])
+}

@@ -4,7 +4,7 @@
   packageStartupMessage("alignR requires a few UNIX specific dependencies.\n")
   sys <- Sys.info()["sysname"]
   if(sys == "Windows"){
-    packageStartupMessage("This can be tricky to install on windows. We suggest using a Linux virtual machine (check out Windows Subsystem for Linux, for example).\n")
+    packageStartupMessage("Some of these can be tricky to install on windows. We suggest using a Linux virtual machine (check out Windows Subsystem for Linux, for example). A walkthough to getting alignR up and running on Windows is availablein the 'alignR_setup' vignette.\n")
   }
   else{
     packageStartupMessage("These are fairly straightforward to install on Linux or MacOS using simple terminal commands--try searching for 'install X', where X is the missing tool. In many cases, sudo apt-get install works fine!\n")
@@ -16,7 +16,9 @@
   perl_check <- suppressWarnings(system("perl -v", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(perl_check == 127){
     Sys.setenv(perl_install = FALSE)
-    warning("No perl installation detected! Some functions will fail.\n")
+    warning(paste0("No perl installation detected! Some functions will fail:\n", 
+                   paste0(unlist(.dependency_function_match("perl")), collapse = "\n\t"),
+                   "\n"))
   }
   else{
     packageStartupMessage("perl is good-to-go!\n")
@@ -27,7 +29,7 @@
   bash_check <- suppressWarnings(system("bash --version", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(bash_check == 127){
     Sys.setenv(bash_install = FALSE)
-    warning("No bash installation detected! Some functions will fail.\n")
+    warning("No bash installation detected! All functions will fail.\n")
   }
   else{
     packageStartupMessage("bash is good-to-go!\n")
@@ -38,7 +40,9 @@
   samtools_check <- suppressWarnings(system("samtools", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(samtools_check == 127){
     Sys.setenv(samtools_install = FALSE)
-    packageStartupMessage("No SAMtools installation detected! Some functions will fail.\n")
+    packageStartupMessage(paste0("No SAMtools installation detected! Some functions will fail:\n", 
+                                 paste0(unlist(.dependency_function_match("samtools")), collapse = "\n\t"),
+                                 "\n"))
   }
   else{
     packageStartupMessage("SAMtools is good-to-go!\n")
@@ -49,7 +53,9 @@
   bcftools_check <- suppressWarnings(system("bcftools", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(bcftools_check == 127){
     Sys.setenv(bcftools_install = FALSE)
-    packageStartupMessage("No bcftools installation detected! Some functions will fail.\n")
+    packageStartupMessage(paste0("No bcftools installation detected! Some functions will fail:\n", 
+                                 paste0(unlist(.dependency_function_match("bcftools")), collapse = "\n\t"),
+                                 "\n"))
   }
   else{
     packageStartupMessage("bcftools is good-to-go!\n")
@@ -60,7 +66,9 @@
   angsd_check <- suppressWarnings(system("angsd", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(angsd_check == 127){
     Sys.setenv(angsd_install = FALSE)
-    packageStartupMessage("No angsd installation detected! Some functions will fail.\n")
+    packageStartupMessage(paste0("No angsd installation detected! Some functions will fail:\n", 
+                                 paste0(unlist(.dependency_function_match("angsd")), collapse = "\n\t"),
+                                 "\n"))
   }
   else{
     packageStartupMessage("angsd is good-to-go!\n")
@@ -72,7 +80,9 @@
   bwa_check <- suppressWarnings(system("bwa", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(bwa_check == 127){
     Sys.setenv(bwa_install = FALSE)
-    packageStartupMessage("No bwa installation detected! Some functions will fail.\n")
+    packageStartupMessage(paste0("No bwa installation detected! Some functions will fail:\n", 
+                                 paste0(unlist(.dependency_function_match("bwa")), collapse = "\n\t"),
+                                 "\n"))
   }
   else{
     packageStartupMessage("bwa is good-to-go!\n")
@@ -83,7 +93,9 @@
   ngsParalog_check <- suppressWarnings(system("ngsParalog", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(ngsParalog_check == 127){
     Sys.setenv(ngsParalog_install = FALSE)
-    packageStartupMessage("No ngsParalog installation detected! The 'filter_paralogs' function will fail.\n")
+    packageStartupMessage(paste0("No ngsParalog installation detected! Some functions will fail:\n", 
+                                 paste0(unlist(.dependency_function_match("ngsParalog")), collapse = "\n\t"),
+                                 "\n"))
   }
   else{
     packageStartupMessage("ngsParalog is good-to-go!\n")
@@ -99,6 +111,8 @@
   }
   else{
     Sys.setenv(stacks_install = FALSE)
-    packageStartupMessage("No STACKS installation detected! Some functions will fail.\n")
+    packageStartupMessage(paste0("No STACKS installation detected! Some functions will fail:\n", 
+                                 paste0(unlist(.dependency_function_match("stacks")), collapse = "\n\t"),
+                                 "\n"))
   }
 }
