@@ -356,3 +356,11 @@
   
   return(dep_tab[names(dep_tab) %in% dependancies])
 }
+
+
+.rename_files <- function(from, to){
+  for(i in 1:length(from)){
+    cmd <- paste0("mv ", from[i], " ", to[i])
+    system(cmd)
+  }
+}

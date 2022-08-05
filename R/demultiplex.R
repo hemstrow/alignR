@@ -18,6 +18,9 @@
 #' @param indices character. Vector of indices to search for in read files.
 #' @param outfile_prefix character, default plate_split. prefix to be appended
 #'   to each resulting .fastq file.
+#' @param sample_names character. Vector of names for output files corresponding
+#'   in order to the provided indices. Prefix and indices will in names
+#'   will be replaced with these names.
 #'
 #' @return Generates files split by index in the directory of the R1 file(s),
 #'   named outfile_prefix_RN_INDEX.fastq, where N is 1, 2, 3 three (for the R1,
@@ -28,7 +31,8 @@
 #'
 #' @author William Hemstrom
 #' @author Michael Miller
-plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_split"){
+plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_split", sample_names = NULL,
+                        par = 1){
 
   #============sanity checks========
   msg <- character()
@@ -67,23 +71,59 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
   R3 <- normalizePath(R3)
   
   dir <- dirname(R1)
-  outfile_prefix <- paste0(dir, "/", outfile_prefix)
 
   #============execute=======
-  if(index_in_header){
-    script <- .fetch_a_script("BarcodeSplitList2Files.pl", "perl")
-    cmd <- paste0("perl ", script, " ", R1, " ", R3, " ", paste0(indices, collapse = ","), " ", outfile_prefix)
+  diambig_prefix <- ifelse(length(R1) == 1,
+                           outfile_prefix,
+                           paste0("file_", 1:length(R1), "_", outfile_prefix))
+  disambig_prefix <- paste0(dir, "/", disambig_prefix)
+  
+  cl <- parallel::makePSOCKcluster(par)
+  doParallel::registerDoParallel(cl)
+  
+  # divide up into ncore chunks
+  iters <- length(R1)
+  
+  # run
+  output <- foreach::foreach(q = 1:par, .inorder = TRUE, .errorhandling = "pass",
+                             .packages = "alignR"
+  ) %dopar% {
+    if(index_in_header){
+      script <- .fetch_a_script("BarcodeSplitList2Files.pl", "perl")
+      cmd <- paste0("perl ", script, " ", R1[q], " ", R3[q], " ", paste0(indices, collapse = ","), " ", disambig_prefix[q])
+    }
+    else{
+      script <- .fetch_a_script("BarcodeSplitList3Files.pl", "perl")
+      cmd <- paste0("perl ", script, " ", R1[q], " ", R2[q], " ", R3[q], " ", paste0(indices, collapse = ","), " ", disambig_prefix[q])
+    }
+    system(cmd)
+    
+    
+    file_names <- list(R1 = paste0(disambig_prefix[q], "_R1_", indices, ".fastq"),
+                       R2 = paste0(disambig_prefix[q], "_R2_", indices, ".fastq"),
+                       R3 = paste0(disambig_prefix[q], "_R3_", indices, ".fastq"))
+    file_names
   }
-  else{
-    script <- .fetch_a_script("BarcodeSplitList3Files.pl", "perl")
-    cmd <- paste0("perl ", script, " ", R1, " ", R2, " ", R3, " ", paste0(indices, collapse = ","), " ", outfile_prefix)
-  }
-  system(cmd)
+  
+  file_names <- list(R1 = unlist(purrr::map(output, "R1")),
+                     R2 = unlist(purrr::map(output, "R2")),
+                     R3 = unlist(purrr::map(output, "R3")))
   
   
-  file_names <- list(R1 = paste0(outfile_prefix, "_R1_", indices, ".fastq"),
-                     R2 = paste0(outfile_prefix, "_R2_", indices, ".fastq"),
-                     R3 = paste0(outfile_prefix, "_R3_", indices, ".fastq"))
+  # rename if requested
+  if(!is.null(sample_names)){
+    .rename_files(file_names$R1, paste0(sample_names[i], "_R1", ".fastq"))
+    file_names$R1 <-paste0(sample_names[i], "_R1", ".fastq")
+    
+    .rename_files(file_names$R3, paste0(sample_names[i], "_R3", ".fastq"))
+    file_names$R3 <-paste0(sample_names[i], "_R3", ".fastq")
+    
+    if(!index_in_header){
+      .rename_files(file_names$R2, paste0(sample_names[i], "_R2", ".fastq"))
+      file_names$R2 <-paste0(sample_names[i], "_R2", ".fastq")
+    }
+  }
+  
   if(index_in_header){
     file_names$R2 <- NULL
   }
@@ -146,46 +186,62 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
   if(!is.null(R2)){R2 <- normalizePath(R2)}
   
   dir <- dirname(R1)
-  outfile_prefix <- paste0(dir, "/", outfile_prefix)
-  #============execute=======
-
+  #============execute============
+  
+  diambig_prefix <- ifelse(length(R1) == 1,
+                           outfile_prefix,
+                           paste0("file_", 1:length(R1), "_", outfile_prefix))
+  
+  outfile_prefix <- paste0(dir, "/", disambig_prefix)
+  
+  cl <- parallel::makePSOCKcluster(par)
+  doParallel::registerDoParallel(cl)
+  
+  # divide up into ncore chunks
+  iters <- length(R1)
+  
   # run
-  if(!is.null(R2)){
-    script <- .fetch_a_script("BarcodeSplitListBestRadPairedEnd.pl", "perl")
-    cmd <-paste0("perl ", script, " ", R1, " ", R2, " ", 
-                 paste0(barcodes, collapse = ","), " ", outfile_prefix,
-                 " ", ifelse(stacks_header, 1, 0))
-    system(cmd)
-  }
-  else{
-    script <- .fetch_a_script("BarcodeSplitListBestRadSingleEnd.pl", "perl")
-    cmd <-paste0("perl ", script, " ", R1, " ", paste0(barcodes, collapse = ","), " ", outfile_prefix)
-    system(cmd)
+  output <- foreach::foreach(q = 1:par, .inorder = TRUE, .errorhandling = "pass",
+                             .packages = "alignR"
+  ) %dopar% {
+    
+    # run
+    if(!is.null(R2)){
+      script <- .fetch_a_script("BarcodeSplitListBestRadPairedEnd.pl", "perl")
+      cmd <-paste0("perl ", script, " ", R1[q], " ", R2[q], " ", 
+                   paste0(barcodes, collapse = ","), " ", disambig_prefix[q],
+                   " ", ifelse(stacks_header, 1, 0))
+      system(cmd)
+    }
+    else{
+      script <- .fetch_a_script("BarcodeSplitListBestRadSingleEnd.pl", "perl")
+      cmd <-paste0("perl ", script, " ", R1[q], " ", paste0(barcodes, collapse = ","), " ", disambig_prefix[q])
+      system(cmd)
+    }
+    
+    file_names <- list(RA = paste0(outfile_prefix[q], "_RA_", barcodes, ".fastq"),
+                      RB = NULL)
+    if(!is.null(R2)){
+      file_names$RB <- paste0(outfile_prefix[q], "_RB_", barcodes, ".fastq")
+    }
+    
+    file_names
   }
   
-  file_names <- list(RA = paste0(outfile_prefix, "_RA_", barcodes, ".fastq"),
-                     RB = NULL)
-  if(!is.null(R2)){
-    file_names$RB <- paste0(outfile_prefix, "_RB_", barcodes, ".fastq")
-  }
-  else{
+  #============cleanup=============
+  file_names <- list(RA = unlist(purrr::map(output, "RA")),
+                     RB = unlist(purrr::map(output, "RB")))
+  if(is.null(R2)){
     file_names$RB <- NULL
   }
 
   # rename
   if(!is.null(sample_names)){
-    for(i in 1:length(barcodes)){
-      cmdRA <- paste0("mv ", outfile_prefix, "_RA_", barcodes[i], ".fastq", " ", sample_names[i], "_RA", ".fastq")
-      system(cmdRA)
-      
-      if(!is.null(R2)){
-        cmdRB <- paste0("mv ", outfile_prefix, "_RB_", barcodes[i], ".fastq", " ", sample_names[i], "_RB", ".fastq")
-        system(cmdRB)
-      }
-    }
-    
+    .rename_files(file_names$RA, paste0(sample_names, "_RA", ".fastq"))
     file_names$RA <- paste0(sample_names, "_RA", ".fastq")
+    
     if(!is.null(R2)){
+      .rename_files(file_names$RB, paste0(sample_names, "_RB", ".fastq"))
       file_names$RB <- paste0(sample_names, "_RB", ".fastq")
     }
   }
