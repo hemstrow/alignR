@@ -4,7 +4,15 @@
 \alias{plate_split}
 \title{Split paired-end .fastq files with reads from different plates.}
 \usage{
-plate_split(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_split")
+plate_split(
+  R1,
+  R2 = NULL,
+  R3,
+  indices,
+  outfile_prefix = "plate_split",
+  sample_names = NULL,
+  par = 1
+)
 }
 \arguments{
 \item{R1}{character. File name for R1 (read one) file.}
@@ -18,7 +26,18 @@ plate_split(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_split")
 \item{indices}{character. Vector of indices to search for in read files.}
 
 \item{outfile_prefix}{character, default plate_split. prefix to be appended
-to each resulting .fastq file.}
+to each resulting .fastq file. A vector can be provided if more than one
+R1/R2/R3 files are also provided.}
+
+\item{sample_names}{character. Vector of names for output files corresponding
+in order to the provided indices. Prefix and indices will in names will be
+replaced with these names. If more than one R1/R2/R3 file is provided, a
+name for each index in each plate should be provided as a list in the same
+order as the R1/R2/R3 files (for example, \code{list(c("plate1_sample1",
+"plate1_sample2"), c("plate2_sample1", "plate2_smaple2"))})}
+
+\item{par}{numeric, default 1. Number of cores to use for the demultiplexing.
+Only used if more than one R1/R2/R3 file are provided.}
 }
 \value{
 Generates files split by index in the directory of the R1 file(s),

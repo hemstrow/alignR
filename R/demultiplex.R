@@ -17,10 +17,16 @@
 #' @param R3 character. File name for R3 (read two) file
 #' @param indices character. Vector of indices to search for in read files.
 #' @param outfile_prefix character, default plate_split. prefix to be appended
-#'   to each resulting .fastq file.
+#'   to each resulting .fastq file. A vector can be provided if more than one
+#'   R1/R2/R3 files are also provided.
 #' @param sample_names character. Vector of names for output files corresponding
-#'   in order to the provided indices. Prefix and indices will in names
-#'   will be replaced with these names.
+#'   in order to the provided indices. Prefix and indices will in names will be
+#'   replaced with these names. If more than one R1/R2/R3 file is provided, a
+#'   name for each index in each plate should be provided as a list in the same
+#'   order as the R1/R2/R3 files (for example, \code{list(c("plate1_sample1",
+#'   "plate1_sample2"), c("plate2_sample1", "plate2_smaple2"))})
+#' @param par numeric, default 1. Number of cores to use for the demultiplexing.
+#'   Only used if more than one R1/R2/R3 file are provided.
 #'
 #' @return Generates files split by index in the directory of the R1 file(s),
 #'   named outfile_prefix_RN_INDEX.fastq, where N is 1, 2, 3 three (for the R1,
@@ -61,9 +67,35 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
   if(!.paired_length_check(R1, R2) | !.paired_length_check(R1, R3)){
     msg <- c(msg, "R1, R2, and R3 must be of equal length.\n")
   }
+  
+  if(!is.null(sample_names)){
+    if(length(R1) == 1){
+      if(!.paired_length_check(indices, unlist(sample_names))){
+        msg <- c(msg, "Provided sample_names must be the same length as indices.")
+      }
+    }
+    else{
+      if(any(lapply(sample_names, function(x){!.paired_length_check(x, indices)}))){
+        msg <- c(msg, "All provided sample_names elements must be the same length as indices.")
+      }
+      if(!.paired_length_check(sample_names, R1)){
+        msg <- c(msg, "sample_names must be equal to the number of R1/R2/R3 files.")
+      }
+    }
+  }
+  
+  if(length(R1) != 1 & length(outfile_prefix) != 1){
+    if(!.paired_length_check(R1, outfile_prefix)){
+      msg <- c(msg, "Length of outfile_prefix must either be 1 or equal to the number of R1/R2/R3 files.")
+    }
+  }
 
   if(length(msg) > 0){
     stop(msg)
+  }
+  
+  if(par != 1 & length(R1) == 1){
+    par <- 1
   }
   
   R1 <- normalizePath(R1)
@@ -73,19 +105,20 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
   dir <- dirname(R1)
 
   #============execute=======
-  diambig_prefix <- ifelse(length(R1) == 1,
-                           outfile_prefix,
-                           paste0("file_", 1:length(R1), "_", outfile_prefix))
+  if(length(R1) != 1 & length(outfile_prefix) == 1){
+    disambig_prefix <- paste0("file_", 1:length(R1), "_", outfile_prefix)
+  }
+  else{
+    disambig_prefix <- outfile_prefix
+  }
+  
   disambig_prefix <- paste0(dir, "/", disambig_prefix)
   
   cl <- parallel::makePSOCKcluster(par)
   doParallel::registerDoParallel(cl)
   
-  # divide up into ncore chunks
-  iters <- length(R1)
-  
   # run
-  output <- foreach::foreach(q = 1:par, .inorder = TRUE, .errorhandling = "pass",
+  output <- foreach::foreach(q = 1:length(R1), .inorder = TRUE, .errorhandling = "pass",
                              .packages = "alignR"
   ) %dopar% {
     if(index_in_header){
@@ -112,11 +145,12 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
   
   # rename if requested
   if(!is.null(sample_names)){
-    .rename_files(file_names$R1, paste0(sample_names[i], "_R1", ".fastq"))
-    file_names$R1 <-paste0(sample_names[i], "_R1", ".fastq")
+    sample_names <- unlist(sample_names)
+    .rename_files(file_names$R1, paste0(sample_names, "_R1", ".fastq"))
+    file_names$R1 <-paste0(sample_names, "_R1", ".fastq")
     
-    .rename_files(file_names$R3, paste0(sample_names[i], "_R3", ".fastq"))
-    file_names$R3 <-paste0(sample_names[i], "_R3", ".fastq")
+    .rename_files(file_names$R3, paste0(sample_names, "_R3", ".fastq"))
+    file_names$R3 <-paste0(sample_names, "_R3", ".fastq")
     
     if(!index_in_header){
       .rename_files(file_names$R2, paste0(sample_names[i], "_R2", ".fastq"))
@@ -146,15 +180,21 @@ plate_split <- function(R1, R2 = NULL, R3, indices, outfile_prefix = "plate_spli
 #'   assumes data is single-end.
 #' @param barcodes character. Vector of barcodes to search for in read files.
 #' @param outfile_prefix character. Prefix to be appended to each resulting
-#'   .fastq file.
+#'   .fastq file. A vector can be provided if more than one R1/R2 files are also
+#'   provided.
 #' @param sample_names character. Vector of names for output files corresponding
-#'   in order to the provided barcodes. Prefix and barcodes will in names
-#'   will be replaced with these names.
+#'   in order to the provided barcodes. Prefix and barcodes will in names will
+#'   be replaced with these names. If more than one R1/R2 file is provided, a
+#'   name for each barcode in each plate should be provided as a list in the
+#'   same order as the R1/R2 files (for example, \code{list(c("plate1_sample1",
+#'   "plate1_sample2"), c("plate2_sample1", "plate2_smaple2"))})
 #' @param stacks_header logical, default TRUE. If TRUE, will fix fastq headers
 #'   to be consistent with those expected by stacks (a unique header ending in
 #'   either /1 or /2 for read one and two, respectively). If FALSE, headers are
 #'   not changed. Only applicable to paired-end sequence data.
-#'   
+#' @param par numeric, default 1. Number of cores to use for the demultiplexing.
+#'   Only used if more than one R1/R2 file are provided.
+#'
 #' @return Generates files split by barcode in the directory of the R1 file(s),
 #'   named SAMPLENAME_RN.fastq or outfile_prefix_RN_BARCODE.fastq, if provided
 #'   with sample names or not, respectively, where N is A or B (for the reads
@@ -177,9 +217,36 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
   if(!.paired_length_check(R1, R2)){
     msg <- c(msg, "R1 and R2 must be of equal length.\n")
   }
+  
+  if(!is.null(sample_names)){
+    if(length(R1) == 1){
+      if(!.paired_length_check(barcodes, unlist(sample_names))){
+        msg <- c(msg, "Provided sample_names must be the same length as barcodes.")
+      }
+    }
+    else{
+      if(any(lapply(sample_names, function(x){!.paired_length_check(x, barcodes)}))){
+        msg <- c(msg, "All provided sample_names elements must be the same length as barcodes.")
+      }
+      if(!.paired_length_check(sample_names, R1)){
+        msg <- c(msg, "sample_names must be equal to the number of R1/R2 files.")
+      }
+    }
+  }
+  
+  if(length(R1) != 1 & length(outfile_prefix) != 1){
+    if(!.paired_length_check(R1, outfile_prefix)){
+      msg <- c(msg, "Length of outfile_prefix must either be 1 or equal to the number of R1/R2 files.")
+    }
+  }
+  
 
   if(length(msg) > 0){
     stop(msg)
+  }
+  
+  if(par != 1 & length(R1) == 1){
+    par <- 1
   }
   
   R1 <- normalizePath(R1)
@@ -188,20 +255,20 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
   dir <- dirname(R1)
   #============execute============
   
-  diambig_prefix <- ifelse(length(R1) == 1,
-                           outfile_prefix,
-                           paste0("file_", 1:length(R1), "_", outfile_prefix))
+  if(length(R1) != 1 & length(outfile_prefix) == 1){
+    disambig_prefix <- paste0("file_", 1:length(R1), "_", outfile_prefix)
+  }
+  else{
+    disambig_prefix <- outfile_prefix
+  }
   
-  outfile_prefix <- paste0(dir, "/", disambig_prefix)
+  disambig_prefix <- paste0(dir, "/", disambig_prefix)
   
   cl <- parallel::makePSOCKcluster(par)
   doParallel::registerDoParallel(cl)
   
-  # divide up into ncore chunks
-  iters <- length(R1)
-  
   # run
-  output <- foreach::foreach(q = 1:par, .inorder = TRUE, .errorhandling = "pass",
+  output <- foreach::foreach(q = 1:length(R1), .inorder = TRUE, .errorhandling = "pass",
                              .packages = "alignR"
   ) %dopar% {
     
@@ -219,10 +286,10 @@ demultiplex <- function(R1, R2 = NULL, barcodes, outfile_prefix = "alignR",
       system(cmd)
     }
     
-    file_names <- list(RA = paste0(outfile_prefix[q], "_RA_", barcodes, ".fastq"),
+    file_names <- list(RA = paste0(disambig_prefix[q], "_RA_", barcodes, ".fastq"),
                       RB = NULL)
     if(!is.null(R2)){
-      file_names$RB <- paste0(outfile_prefix[q], "_RB_", barcodes, ".fastq")
+      file_names$RB <- paste0(disambig_prefix[q], "_RB_", barcodes, ".fastq")
     }
     
     file_names

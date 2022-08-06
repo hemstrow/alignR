@@ -22,16 +22,23 @@ assumes data is single-end.}
 \item{barcodes}{character. Vector of barcodes to search for in read files.}
 
 \item{outfile_prefix}{character. Prefix to be appended to each resulting
-.fastq file.}
+.fastq file. A vector can be provided if more than one R1/R2 files are also
+provided.}
 
 \item{sample_names}{character. Vector of names for output files corresponding
-in order to the provided barcodes. Prefix and barcodes will in names
-will be replaced with these names.}
+in order to the provided barcodes. Prefix and barcodes will in names will
+be replaced with these names. If more than one R1/R2 file is provided, a
+name for each barcode in each plate should be provided as a list in the
+same order as the R1/R2 files (for example, \code{list(c("plate1_sample1",
+"plate1_sample2"), c("plate2_sample1", "plate2_smaple2"))})}
 
 \item{stacks_header}{logical, default TRUE. If TRUE, will fix fastq headers
 to be consistent with those expected by stacks (a unique header ending in
 either /1 or /2 for read one and two, respectively). If FALSE, headers are
 not changed. Only applicable to paired-end sequence data.}
+
+\item{par}{numeric, default 1. Number of cores to use for the demultiplexing.
+Only used if more than one R1/R2 file are provided.}
 }
 \value{
 Generates files split by barcode in the directory of the R1 file(s),
