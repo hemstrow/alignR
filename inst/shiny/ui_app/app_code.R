@@ -1,12 +1,18 @@
 .parse_shinyFiles_path <- function(root, input_obj){
-  path <- as.list(unlist(input_obj[[1]]))
-  if(path[[1]] == ""){
-    path[1] <- NULL
+  out <- character(length(input_obj[[1]]))
+  
+  for(i in 1:length(input_obj[[1]])){
+    path <- as.list(unlist(input_obj[[1]][[i]]))
+    if(path[[1]] == ""){
+      path[1] <- NULL
+    }
+    
+    base_dir <- input_obj$root
+    base_dir <- root[which(names(root) == base_dir)]
+    out[i] <- normalizePath(do.call(file.path, c(base_dir, path)))
   }
   
-  base_dir <- input_obj$root
-  base_dir <- root[which(names(root) == base_dir)]
-  return(normalizePath(do.call(file.path, c(base_dir, path))))
+  return(out)
 }
 
 .fastq_file_reporter <- function(files){

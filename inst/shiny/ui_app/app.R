@@ -42,6 +42,17 @@ ui <- fluidPage(
   textOutput("file_name_header"),
   uiOutput("demultiplex_options"),
   actionButton("go_demultiplex", "Demultiplex reads!")
+  
+  #===============Alignment============
+  titlePanel("Alignment"),
+  
+  inputPanel(sidebarLayout(
+    fluidRow(h4("If you already have demultiplexed data, select RA and RB (forward and reverse) reads below."),
+             shinyFilesButton("pre_existing_RA", label = "RA Files", multiple = TRUE, title = "Select RA Reads"),
+             shinyFilesButton("pre_existing_RB", label = "RB Files", multiple = TRUE, title = "Select RB Reads"))
+    
+  ))
+  
 )
 
 
@@ -50,11 +61,13 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   
-  #==========read in input files===========
-  x <- reactiveValues(files = list(), files_report = list(), 
-                      files_are_good = 0, have_sample_ids = 0,
-                      x$demultiplexed_files = list()
-                      x$demultiplexed = 0)
+  #==========read in input files for demultiplexing===========
+  x <- reactiveValues(files = list(), 
+                      files_report = list(), 
+                      files_are_good = 0, 
+                      have_sample_ids = 0,
+                      demultiplexed_files = list(),
+                      demultiplexed = 0)
   
   # generate image
   barcode.type <- eventReactive(input$barcodes,{
@@ -132,7 +145,7 @@ server <- function(input, output, session) {
       else{
         file_R_lab <- "R3: read file"
       }
-      shinyFilesButton(paste0("fastq_R", i), label = file_R_lab, multiple = FALSE, accept = c(".fastq", ".fq"), title = ".fastq or .fq file.")
+      shinyFilesButton(paste0("fastq_R", i), label = file_R_lab, multiple = TRUE, accept = c(".fastq", ".fq"), title = ".fastq or .fq file.")
     })
     
     shinyjs::hidden(fileinputs)
@@ -315,16 +328,30 @@ server <- function(input, output, session) {
     x$have_sample_ids <- 1
   })
   
-  #=============run demultiplexing======================
+  #==========run demultiplexing======================
   observeEvent(input$go_demultiplex,{
+    browser()
     if(x$files_are_good){
       if("Seperate fastq File" %in% input$barcodes){
-        x$files$plate_split_files <- plate_split(R1 = readLines(x$files$R1), 
-                                                 R2 = ifelse(input$is.paired, readLines(x$files$R2), NULL),
-                                                 R3 = readLines(x$files$R3), 
-                                                 indices = ifelse(length(input$barcodes) > 1, 
-                                                                  readLines(x$files$barcode_file_2), 
-                                                                  readLines(x$barcode_file_1)),
+        
+        if(length(input$barcodes) > 1){
+          indices <- readLines(x$files$barcode_file_2)
+        }
+        else{
+          indices <- readLines(x$barcode_file_1)
+        }
+        
+        if(input$is.paired){
+          R2 <- x$files$R2
+        }
+        else{
+          R2 <- NULL
+        }
+        
+        x$files$plate_split_files <- plate_split(R1 = x$files$R1, 
+                                                 R2 = R2,
+                                                 R3 = x$files$R3, 
+                                                 indices = indices,
                                                  outfile_prefix = "alignR_gui_plate_split")
         if(length(input$barcodes) == 1){
           x$files$demultiplexed_files <- x$files$plate_split_files
@@ -333,24 +360,48 @@ server <- function(input, output, session) {
       }
       
       if(any(c("In Headers", "Start of Reads") %in% input$barcodes)){
-        x$files$demultiplexed_files <- demultiplex(R1 = ifelse("Seperate fastq File" %in% input$barcodes,
-                                                               x$files$plate_split_files$R1,
-                                                               readLines(x$files$R1)),
-                                                   R2 = ifelse(input$is.paired,
-                                                               ifelse("Seperate fastq File" %in% input$barcodes,
-                                                                      x$files$plate_split_files$R3,
-                                                                      readLines(x$files$R3)),
-                                                               NULL),
-                                                   sample_names = ifelse(x$have_sample_ids,
-                                                                         readLines(x$files$sample_ids),
-                                                                         NULL),
-                                                   barcodes = readLines(x$files$barcode_file_1))
+        # fill R1
+        if("Seperate fastq File" %in% input$barcodes){
+          R1 <- x$files$plate_split_files$R1
+        }
+        else{
+          R1 <- x$files$R1
+        }
+        
+        # fill R2
+        if(input$is.paired){
+          if("Seperate fastq File" %in% input$barcodes){
+            R2 <- x$files$plate_split_files$R3
+          }
+          else{
+            R2 <- x$files$R3
+          }
+        }
+        else{
+          R2 <- NULL
+        }
+        
+        # fill sample_names
+        if(x$have_sample_ids){
+          sample_names <- readLines(x$files$sample_ids)
+        }
+        else{
+          sample_names <- NULL
+        }
+        
+        
+        x$files$demultiplexed_files <- demultiplex(R1 = R1,
+                                                   R2 = R2,
+                                                   sample_names = sample_names,
+                                                   barcodes = readLines(x$files$barcode_file_1),
+                                                   outfile_prefix = "alignR_gui_demultiplex")
       }
       
       x$demultiplexed <- 1
     }
   })
   
+  #==========figure out parameters for aligning==============
 } 
 
 shinyApp(ui, server)
