@@ -19,7 +19,7 @@ $time=localtime;
 
 print OUTFILE ("##fileformat=VCFv4.0\n" . "##fileDate=" . $time . "\n" . "##source=alignR_with_ANGSD\n" . "##INFO=<ID=NS,Number=1,Type=Integer,Description=\"Number of Samples With Data\">\n");
 print OUTFILE ("##INFO=<ID=AC,Number=1,Type=Integer,Description=\"Allele Count\">\n" . "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n");
-print OUTFILE ("#CHROM\t" . "POS\t" . "REF\t" . "ALT\t" . "QUAL\t" . "FILTER\t" . "INFO\t" . "FORMAT\t");
+print OUTFILE ("#CHROM\t" . "POS\t" . "ID\t" "REF\t" . "ALT\t" . "QUAL\t" . "FILTER\t" . "INFO\t" . "FORMAT\t");
 
 while(<BAMFILE>){
   chomp($_);
@@ -27,7 +27,7 @@ while(<BAMFILE>){
 }
 print OUTFILE "\n";
 
-
+my $snp=1;
 while(<FILE>){
   
   chomp($_);
@@ -42,12 +42,14 @@ while(<FILE>){
   # initialize and grab chromosome/position
   $ngeno = 0;
   @outline = ();
-  $chrom = shift(@loci);
-  $pos = shift(@loci);
+  $chrom = shift(@loci); 
+  $pos = shift(@loci); 
   $maj = shift(@loci);
   $min = shift(@loci);
-  push(@outline, $chrom);
-  push(@outline, $pos);
+  push(@outline, $chrom); # #Chrom
+  push(@outline, $pos); # POS
+  push(@outline, "SNP_", .$snp); # ID
+  $snp++;
   
   @outarray = ();
   $ac = 0;
