@@ -35,7 +35,15 @@
     report_barcode <- c(report_barcode, paste0("Barcode/index file 2:", files$barcode_file_2))
   }
   
-  out <- list(fastq = report_fastq, barcode = report_barcode)
+  report_demulti <- list()
+  if("RA" %in% names(files)){
+    report_demulti$RA <- c(report_fastq, paste0("RA fastq file: ", files$RA))
+  }
+  if("RB" %in% names(files)){
+    report_demulti$RB <- c(report_fastq, paste0("RB fastq file: ", files$RB))
+  }
+  
+  out <- list(fastq = report_fastq, barcode = report_barcode, demulti = report_demulti)
   
   return(out)
 }

@@ -15,7 +15,7 @@ align_denovo(
   re_align = TRUE,
   mapQ = 5,
   remove_duplicates = TRUE,
-  remove_improper_pairs = TRUE,
+  remove_improper_pairs = FALSE,
   ask_confirmation = TRUE
 )
 }

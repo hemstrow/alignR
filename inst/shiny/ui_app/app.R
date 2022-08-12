@@ -9,7 +9,6 @@ root <- c(wd = normalizePath("."), root = "/", home = normalizePath("~"))
 
 ui <- fluidPage(
   useShinyjs(),
-  
   #===============Demultiplexing and initial inputs===============
   titlePanel("Demultiplexing:"),
   sidebarLayout( 
@@ -20,8 +19,8 @@ ui <- fluidPage(
                                              "Start of Reads",
                                              "Seperate fastq File"), 
                               options = list(maxItems = 2),
-                           multiple = TRUE),
-               checkboxInput("is.paired", "Is your data paired-end?", value = FALSE),
+                              multiple = TRUE),
+               checkboxInput("is.paired", "Is your data paired-end?", value = TRUE),
                actionButton("start_file_input", "Proceed to file input"))
     ),
     mainPanel(
@@ -29,29 +28,39 @@ ui <- fluidPage(
   ),
   
   titlePanel("File Selection: "),
-    
+  
   sidebarLayout(sidebarPanel(fluidRow(h4("Fastqs:"), 
                                       uiOutput("input_file_selector"))),
                 mainPanel(htmlOutput("fastq_files_report"))
   ),
   
   sidebarLayout(sidebarPanel(fluidRow(h4("Barcodes:"),
-                                     uiOutput("input_barcode_selector"))),
-               mainPanel(htmlOutput("barcode_files_report")),
+                                      uiOutput("input_barcode_selector"))),
+                mainPanel(htmlOutput("barcode_files_report")),
   ),
   textOutput("file_name_header"),
   uiOutput("demultiplex_options"),
-  actionButton("go_demultiplex", "Demultiplex reads!")
+  actionButton("go_demultiplex", "Demultiplex reads!"),
   
+  
+  actionButton("input_pre_demultiplexed", "I have pre-demultiplexed fastq files!"),
+  hidden(uiOutput("pre_demulti_input_panel")),
   #===============Alignment============
   titlePanel("Alignment"),
-  
-  inputPanel(sidebarLayout(
-    fluidRow(h4("If you already have demultiplexed data, select RA and RB (forward and reverse) reads below."),
-             shinyFilesButton("pre_existing_RA", label = "RA Files", multiple = TRUE, title = "Select RA Reads"),
-             shinyFilesButton("pre_existing_RB", label = "RB Files", multiple = TRUE, title = "Select RB Reads"))
-    
-  ))
+  mainPanel(tabsetPanel(type = "tabs",
+                        tabPanel("Alignment Options", 
+                                 hidden(radioButtons("alignment_radio", 
+                                                     label = "Alignment Method", 
+                                                     choices = c("reference", "denovo"), 
+                                                     selected = character())),
+                                 hidden(uiOutput("alignment_panel"))),
+                        tabPanel("Demultiplexed File Report", 
+                                 fluidRow(column(6, 
+                                                 uiOutput("demultiplexed_files_report_RA")),
+                                          
+                                          column(6, 
+                                                 uiOutput("demultiplexed_files_report_RB")))))
+  )
   
 )
 
@@ -66,10 +75,9 @@ server <- function(input, output, session) {
                       files_report = list(), 
                       files_are_good = 0, 
                       have_sample_ids = 0,
-                      demultiplexed_files = list(),
                       demultiplexed = 0)
   
-  # generate image
+  # figure out which images we need
   barcode.type <- eventReactive(input$barcodes,{
     img_table <- data.frame(input = c("In Headers",
                                       "Start of Reads",
@@ -82,7 +90,7 @@ server <- function(input, output, session) {
     return(img)
   })
   
-  
+  # generate images
   output$barcode_locations_image <- renderUI({
     res <- list()
     validate(need(!all(c("Start of Reads", "In Headers") %in% input$barcodes), "Barcodes can be either in fastq headers OR at the beginning of reads, but not both!"))
@@ -145,7 +153,7 @@ server <- function(input, output, session) {
       else{
         file_R_lab <- "R3: read file"
       }
-      shinyFilesButton(paste0("fastq_R", i), label = file_R_lab, multiple = TRUE, accept = c(".fastq", ".fq"), title = ".fastq or .fq file.")
+      shinyFilesButton(paste0("fastq_R", i), label = file_R_lab, multiple = TRUE, title = ".fastq or .fq file.")
     })
     
     shinyjs::hidden(fileinputs)
@@ -191,6 +199,7 @@ server <- function(input, output, session) {
     x$files_are_good <- 0
   })
   
+  # show or hide the appropriate input selectors
   observeEvent(eventExpr = input$start_file_input, handlerExpr = {
     if(length(input$barcodes) != 0){
       shinyjs::show("fastq_R1")
@@ -286,7 +295,7 @@ server <- function(input, output, session) {
     x$files <- files
   })
   
-  # accept sample IDs and begin
+  # take sample IDs
   output$demultiplex_options <- renderUI({
     sib <- shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = FALSE, 
                             title = "Tab delimited key for demultiplexed samples. Two or three columns for: seperate fastq file barcodes, header/in-read barcodes, and sample name.")
@@ -294,14 +303,16 @@ server <- function(input, output, session) {
   })
   
   output$file_name_header <- renderText("Demultiplexing Options:")
-    output$barcode_files_report <- renderUI({
+  
+  # generate reports on barcode and fastq files
+  output$barcode_files_report <- renderUI({
     lapply(x$files_report$barcode, p)
   })
-  
   output$fastq_files_report <- renderUI({
     lapply(x$files_report$fastq, p)
   })
   
+  # show or hide reports and 'go' buttons based on inputs
   observeEvent(x$files_are_good, {
     if(x$files_are_good){
       x$files_report <- .fastq_file_reporter(x$files)
@@ -323,14 +334,15 @@ server <- function(input, output, session) {
   })
   shinyFileChoose(input, 'sample_ids', root=c(root))
 
+  # import and note that we have sample ids if we do
   observeEvent(input$sample_ids,{
     x$files$sample_ids <- .parse_shinyFiles_path(root, input$sample_ids)
     x$have_sample_ids <- 1
   })
   
   #==========run demultiplexing======================
+  # demultiplex
   observeEvent(input$go_demultiplex,{
-    browser()
     if(x$files_are_good){
       if("Seperate fastq File" %in% input$barcodes){
         
@@ -401,7 +413,167 @@ server <- function(input, output, session) {
     }
   })
   
-  #==========figure out parameters for aligning==============
+  #==========import existing demultiplexed reads==============
+  # panel layout
+  output$pre_demulti_input_panel <- renderUI({
+      inputPanel(
+        column(12,
+               checkboxInput("is.paired.pre.existing", "Is your data paired-end?", value = TRUE),
+               shinyFilesButton("pre_existing_RA", label = "RA Files", multiple = TRUE, title = "Select RA Reads"),
+               hidden(shinyFilesButton("pre_existing_RB", label = "RB Files", multiple = TRUE, title = "Select RB Reads")),
+               hidden(actionButton("parse_pre_existing_demultiplexed", "Read In Demultiplexed Files"))))
+  })
+  
+  # show panel only if pre_demultiplexed file input is selected
+  observeEvent(input$input_pre_demultiplexed,{
+    toggle("pre_demulti_input_panel")
+  })
+  
+  observeEvent(input$is.paired.pre.existing,{
+    toggle("pre_existing_RB")
+  })
+  
+  # show 'go' button if correct files have been selected given paired/unpaired
+  observeEvent(is.list(input$pre_existing_RA) | is.list(input$pre_existing_RB), ignoreInit = TRUE, {
+    if(input$is.paired.pre.existing){
+      if(is.list(input$pre_existing_RA) & is.list(input$pre_existing_RB)){
+        show("parse_pre_existing_demultiplexed")
+      }
+      else{
+        hide("parse_pre_existing_demultiplexed")
+      }
+    }
+    else{
+      if(is.list(input$pre_existing_RA)){
+        show("parse_pre_existing_demultiplexed")
+      }
+      else{
+        hide("parse_pre_existing_demultiplexed")
+      }
+    }
+  })
+  
+  shinyFileChoose(input, 'pre_existing_RA', root=c(root))
+  shinyFileChoose(input, 'pre_existing_RB', root=c(root))
+  
+  # parse in files
+  observeEvent(eventExpr = input$parse_pre_existing_demultiplexed,
+               ignoreInit = TRUE, handlerExpr = {
+                 x$files$demultiplexed_files <- NULL # clear out any others that have been previously entered.
+                 
+                 x$demultiplexed <- 0
+                 if(input$is.paired.pre.existing){
+                   if(is.list(input$pre_existing_RA) & is.list(input$pre_existing_RB)){
+                     RA <- .parse_shinyFiles_path(root, input$pre_existing_RA)
+                     RB <- .parse_shinyFiles_path(root, input$pre_existing_RB)
+                     
+                     validate(need(length(RA) == length(RB), message = "An equal number of RA and RB files must be provided."))
+                     
+                     x$files$demultiplexed_files <- vector("list", 2)
+                     names(x$files$demultiplexed_files) <- c("RA", "RB")
+                     x$files$demultiplexed_files$RA <- RA
+                     x$files$demultiplexed_files$RB <- RB
+                     
+                     x$demultiplexed <- 1
+                   }
+                 }
+                 else{
+                   if(is.list(input$pre_existing_RA)){
+                     x$files$demultiplexed_files <- list(RA = .parse_shinyFiles_path(root, input$pre_existing_RA))
+                     
+                     x$demultiplexed <- 1
+                   }
+                 }
+                 
+                 # reset our file inputs for validation purposes
+                 shinyjs::reset("pre_existing_RB") 
+                 shinyjs::reset("pre_existing_RA")
+               })
+  
+  
+  #==========report demultiplex results=======================
+  # generate reporters
+  output$demultiplexed_files_report_RA <- renderUI({
+    lapply(x$files_report$demulti$RA, p)
+  })
+  output$demultiplexed_files_report_RB <- renderUI({
+    lapply(x$files_report$demulti$RB, p)
+  })
+  
+  # show or hide reporters
+  observeEvent(x$demultiplexed, ignoreInit = TRUE, {
+    if(x$demultiplexed){
+      x$files_report$demulti <- .fastq_file_reporter(x$files$demultiplexed_files)$demulti
+      
+      
+      shinyjs::show("demultiplexed_files_report_RA")
+      shinyjs::show("demultiplexed_files_report_RB")
+      
+    }
+    else{
+      shinyjs::hide("demultiplexed_files_report_RA")
+      shinyjs::hide("demultiplexed_files_report_RB")
+    }
+  })
+  
+  #==========run alignment============================
+  # generate the alignment panel based on denovo or reference, paired or unpaired inputs
+  output$alignment_panel <- renderUI({
+    
+    validate(need(input$alignment_radio %in% c("denovo", "reference"), message = "Please select an alignment method."))
+    if(input$alignment_radio == "denovo"){
+      if(length(x$demultiplexed_files) == 2){
+        fluidRow(inputPanel(
+          numericInput("M", "M, the number of mismatches allowed between alignments within individuals", 3, 1, step = 1),
+          numericInput("n", "n, the number of mismatches allowed between alignments between individuals", 3, 1, step = 1),
+          checkboxInput("check_headers", "Check that fastq headers are STACKS acceptable. If you are sure they are OK, uncheck this.", value = TRUE),
+          checkboxInput("stacks_cleanup", "Clean-up accessory files after completion.", value = TRUE),
+          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+          checkboxInput("rmdup", "Remove PCR duplicates?", value = TRUE),
+          checkboxInput("rmimp", "Remove improperly paired reads? This should usually be FALSE.", value = FALSE),
+          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+        ))
+      }
+      else{
+        fluidRow(inputPanel(
+          numericInput("M", "M, the number of mismatches allowed between alignments within individuals", 3, 1, step = 1),
+          numericInput("n", "n, the number of mismatches allowed between alignments between individuals", 3, 1, step = 1),
+          checkboxInput("check_headers", "Check that fastq headers are STACKS acceptable. If you are sure they are OK, uncheck this.", value = TRUE),
+          checkboxInput("stacks_cleanup", "Clean-up accessory files after completion.", value = TRUE),
+          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+        ))
+      }
+    }
+    else if(input$alignment_radio == "reference"){
+      if(length(x$demultiplexed_files) == 2){
+        fluidRow(inputPanel(
+          shinyFilesButton("reference_genome", "Select Reference Genome", title = "Select Reference Genome", multiple = FALSE),
+          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+          checkboxInput("rmdup", "Remove PCR duplicates?", value = TRUE),
+          checkboxInput("rmimp", "Remove improperly paired reads?", value = TRUE),
+          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+        ))
+      }
+      else{
+        fluidRow(inputPanel(
+          shinyFilesButton("reference_genome", "Select Reference Genome", title = "Select Reference Genome", multiple = FALSE),
+          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+        ))
+      }
+    }
+  })
+  
+  shinyFileChoose(input, 'reference_genome', root=c(root))
+  
+  observeEvent(x$demultiplexed, ignoreInit = TRUE, {
+    show("alignment_radio")
+  })
+  
+  observeEvent(input$alignment_radio, ignoreInit = TRUE,{
+    show("alignment_panel")
+  })
 } 
 
 shinyApp(ui, server)

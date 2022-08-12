@@ -230,7 +230,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                          re_align = TRUE,
                          mapQ = 5,
                          remove_duplicates = TRUE, 
-                         remove_improper_pairs = TRUE,
+                         remove_improper_pairs = FALSE,
                          ask_confirmation = TRUE){
   
   #==========sanity checks==========================
