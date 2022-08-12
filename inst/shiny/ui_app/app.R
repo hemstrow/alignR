@@ -9,6 +9,11 @@ root <- c(wd = normalizePath("."), root = "/", home = normalizePath("~"))
 
 ui <- fluidPage(
   useShinyjs(),
+  
+  tags$head(tags$style("
+      .Fixed_input_row_75{height:75px;}"
+  )),
+  
   #===============Demultiplexing and initial inputs===============
   titlePanel("Demultiplexing:"),
   sidebarLayout( 
@@ -29,15 +34,30 @@ ui <- fluidPage(
   
   titlePanel("File Selection: "),
   
-  sidebarLayout(sidebarPanel(fluidRow(h4("Fastqs:"), 
-                                      uiOutput("input_file_selector"))),
-                mainPanel(htmlOutput("fastq_files_report"))
+  h4("Fastqs:"),
+  sidebarLayout(sidebarPanel(fluidRow(class = "Fixed_input_row_75",
+                                      column(6, hidden(textOutput("fastq_R1_note"))),
+                                      column(6, hidden(shinyFilesButton("fastq_R1", "R1 Fastq(s)", title = "Select R1 Fastq file(s)", multiple = TRUE)))),
+                             fluidRow(class = "Fixed_input_row_75",
+                                      column(6, hidden(textOutput("fastq_R2_note"))),
+                                      column(6, hidden(shinyFilesButton("fastq_R2", "R2 Fastq(s)", title = "Select R2 Fastq file(s)", multiple = TRUE)))),
+                             fluidRow(class = "Fixed_input_row_75",
+                                      column(6, hidden(textOutput("fastq_R3_note"))),
+                                      column(6, hidden(shinyFilesButton("fastq_R3", "R3 Fastq(s)", title = "Select R3 Fastq file(s)", multiple = TRUE))))),
+    mainPanel(htmlOutput("fastq_files_report"))
   ),
   
-  sidebarLayout(sidebarPanel(fluidRow(h4("Barcodes:"),
-                                      uiOutput("input_barcode_selector"))),
-                mainPanel(htmlOutput("barcode_files_report")),
+  h4("Barcodes:"),
+  sidebarLayout(sidebarPanel(fluidRow(class = "Fixed_input_row_75",
+                                      column(6, hidden(textOutput("barcode_file_1_note"))),
+                                      column(6, hidden(shinyFilesButton("barcode_file_1", "Barcode 1", title = "Select file containing barcodes", multiple = FALSE)))),
+                             fluidRow(class = "Fixed_input_row_75",
+                                      column(6, hidden(textOutput("barcode_file_2_note"))),
+                                      column(6, hidden(shinyFilesButton("barcode_file_2", "Barcode 2", title = "Select file containing barcodes", multiple = FALSE))))),
+                mainPanel(htmlOutput("barcode_files_report"))
   ),
+  
+  
   textOutput("file_name_header"),
   uiOutput("demultiplex_options"),
   actionButton("go_demultiplex", "Demultiplex reads!"),
@@ -134,60 +154,12 @@ server <- function(input, output, session) {
   
   # generate selector boxes for both the input fastqs and the barcodes
   ## fastqs
-  output$input_file_selector <- renderUI({
-    validate(need(!all(c("Start of Reads", "In Headers") %in% input$barcodes), ""))
-    
-    file_R_lab <- "NA"
-    fileinputs <- lapply(1:3, function(i){
-      if(i == 1){
-        file_R_lab <- "R1: read file"
-      }
-      else if(i == 2){
-        if("Seperate fastq File" %in% input$barcodes){
-          file_R_lab <- "R2: barcode file"
-        }
-        else{
-          file_R_lab <- "R2: read file"
-        }
-      }
-      else{
-        file_R_lab <- "R3: read file"
-      }
-      shinyFilesButton(paste0("fastq_R", i), label = file_R_lab, multiple = TRUE, title = ".fastq or .fq file.")
-    })
-    
-    shinyjs::hidden(fileinputs)
-  })
   shinyFileChoose(input, 'fastq_R1', root=c(root))
   shinyFileChoose(input, 'fastq_R2', root=c(root))
   shinyFileChoose(input, 'fastq_R3', root=c(root))
   
   
   ## barcodes
-  output$input_barcode_selector <- renderUI({
-    validate(need(!all(c("Start of Reads", "In Headers") %in% input$barcodes), ""))
-    
-    barcode_file_lab_index <- "NA"
-    barcodeinputs <- lapply(1:2, function(i){
-      if(i == 1){
-        if("In Headers" %in% input$barcodes){
-          barcode_file_lab_index <- "header barcodes"
-        }
-        else if("Start of Reads" %in% input$barcodes){
-          barcode_file_lab_index <- "in-read barcodes"
-        }
-        else{
-          barcode_file_lab_index <- "R2 read barcodes"
-        }
-      }
-      else{
-        barcode_file_lab_index <- "R2 read barcodes"
-      }
-      shinyFilesButton(paste0("barcode_file_", i), label = barcode_file_lab_index, multiple = FALSE, title = "File with barcodes/indices, one per line.")
-    })
-    
-    shinyjs::hidden(barcodeinputs)
-  })
   shinyFileChoose(input, 'barcode_file_1', root=c(root))
   shinyFileChoose(input, 'barcode_file_2', root=c(root))
   
@@ -199,29 +171,71 @@ server <- function(input, output, session) {
     x$files_are_good <- 0
   })
   
-  # show or hide the appropriate input selectors
+  # show or hide the appropriate input selectors and edit text labels
+  ## define consistant notes
+  output$fastq_R1_note <- renderText("Forward read files (R1):")
+  output$fastq_R3_note <- renderText("Reverse read files (R3):")
+  output$barcode_file_2_note <- renderText("Barcodes matching R2 (seperate fastq file barcodes):")
+  
+  ## define others and show appropriate
   observeEvent(eventExpr = input$start_file_input, handlerExpr = {
-    if(length(input$barcodes) != 0){
-      shinyjs::show("fastq_R1")
-    }
+    hide("fastq_R1")
+    hide("fastq_R2")
+    hide("fastq_R3")
+    hide("barcode_file_1")
+    hide("barcode_file_2")
+    hide("fastq_R1_note")
+    hide("fastq_R2_note")
+    hide("fastq_R3_note")
+    hide("barcode_file_1_note")
+    hide("barcode_file_2_note")
     
-    
-    if("In Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes){
-      shinyjs::show("barcode_file_1")
-    }
-    
-    if(input$is.paired){
-      shinyjs::show("fastq_R2")
-      
-      if("Seperate fastq File" %in% input$barcodes){
-        shinyjs::show("fastq_R3")
-        shinyjs::show("barcode_file_2")
-      }
-    }
-    else if("Seperate fastq File" %in% input$barcodes){
-      shinyjs::show("fastq_R2")
-      shinyjs::show("barcode_file_2")
-    }
+   if(!all(c("Start of Reads", "In Headers") %in% input$barcodes)){
+     if(length(input$barcodes) != 0){
+       show("fastq_R1")
+       show("fastq_R1_note")
+     }
+     
+     
+     if("In Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes){
+       if("In Headers" %in% input$barcodes){
+         output$barcode_file_1_note <- renderText("Header barcodes:")
+       }
+       else{
+         output$barcode_file_1_note <- renderText("In-read barcodes:")
+       }
+       show("barcode_file_1_note")
+       show("barcode_file_1")
+     }
+     
+     if(input$is.paired){
+       if(length(input$barcodes) != 0){
+         show("fastq_R2")
+         show("fastq_R2_note")
+       }
+       
+       if("Seperate fastq File" %in% input$barcodes){
+         output$fastq_R2_note <- renderText("Barcode reads (R2):")
+         
+         show("fastq_R3_note")
+         show("barcode_file_2_note")
+         show("fastq_R3")
+         show("barcode_file_2")
+       }
+       else{
+         output$fastq_R2_note <- renderText("Reverse read files (R2):")
+       }
+     }
+     else if("Seperate fastq File" %in% input$barcodes){
+       output$barcode_file_2_note <- renderText("R2 barcodes:")
+       output$fastq_R2_note <- renderText("Barcode reads (R2):")
+       
+       show("barcode_file_2_note")
+       show("fastq_R2_note")
+       show("fastq_R2")
+       show("barcode_file_2")
+     }
+   }
   })
   
   # locate appropriate files
@@ -299,7 +313,7 @@ server <- function(input, output, session) {
   output$demultiplex_options <- renderUI({
     sib <- shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = FALSE, 
                             title = "Tab delimited key for demultiplexed samples. Two or three columns for: seperate fastq file barcodes, header/in-read barcodes, and sample name.")
-    shinyjs::hidden(sib)
+    hidden(sib)
   })
   
   output$file_name_header <- renderText("Demultiplexing Options:")
@@ -318,18 +332,18 @@ server <- function(input, output, session) {
       x$files_report <- .fastq_file_reporter(x$files)
       
       
-      shinyjs::show("barcode_files_report")
-      shinyjs::show("fastq_files_report")
-      shinyjs::show("sample_ids")
-      shinyjs::show("go_demultiplex", asis = TRUE)
-      shinyjs::show("file_name_header", asis = TRUE)
+      show("barcode_files_report")
+      show("fastq_files_report")
+      show("sample_ids")
+      show("go_demultiplex", asis = TRUE)
+      show("file_name_header", asis = TRUE)
     }
     else{
-      shinyjs::hide("barcode_files_report")
-      shinyjs::hide("fastq_files_report")
-      shinyjs::hide("go_demultiplex")
-      shinyjs::hide("file_name_header")
-      shinyjs::hide("sample_ids")
+      hide("barcode_files_report")
+      hide("fastq_files_report")
+      hide("go_demultiplex")
+      hide("file_name_header")
+      hide("sample_ids")
     }
   })
   shinyFileChoose(input, 'sample_ids', root=c(root))
@@ -486,8 +500,8 @@ server <- function(input, output, session) {
                  }
                  
                  # reset our file inputs for validation purposes
-                 shinyjs::reset("pre_existing_RB") 
-                 shinyjs::reset("pre_existing_RA")
+                 reset("pre_existing_RB") 
+                 reset("pre_existing_RA")
                })
   
   
@@ -506,13 +520,13 @@ server <- function(input, output, session) {
       x$files_report$demulti <- .fastq_file_reporter(x$files$demultiplexed_files)$demulti
       
       
-      shinyjs::show("demultiplexed_files_report_RA")
-      shinyjs::show("demultiplexed_files_report_RB")
+      show("demultiplexed_files_report_RA")
+      show("demultiplexed_files_report_RB")
       
     }
     else{
-      shinyjs::hide("demultiplexed_files_report_RA")
-      shinyjs::hide("demultiplexed_files_report_RB")
+      hide("demultiplexed_files_report_RA")
+      hide("demultiplexed_files_report_RB")
     }
   })
   
