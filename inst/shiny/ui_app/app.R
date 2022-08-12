@@ -16,55 +16,58 @@ ui <- fluidPage(
   
   #===============Demultiplexing and initial inputs===============
   titlePanel("Demultiplexing:"),
-  sidebarLayout( 
-    sidebarPanel(
-      fluidRow(selectizeInput("barcodes", 
-                              "Where are your barcodes located?", 
-                              choices = list("In Headers",
-                                             "Start of Reads",
-                                             "Seperate fastq File"), 
-                              options = list(maxItems = 2),
-                              multiple = TRUE),
-               checkboxInput("is.paired", "Is your data paired-end?", value = TRUE),
-               actionButton("start_file_input", "Proceed to file input"))
-    ),
-    mainPanel(
-      uiOutput("barcode_locations_image"))
+  actionButton("input_pre_demultiplexed", "I have demultiplexed fastq files!"),
+  tags$div(id = "demultiplexing",
+           sidebarLayout( 
+             sidebarPanel(
+               fluidRow(selectizeInput("barcodes", 
+                                       "Where are your barcodes located?", 
+                                       choices = list("In Headers",
+                                                      "Start of Reads",
+                                                      "Seperate fastq File"), 
+                                       options = list(maxItems = 2),
+                                       multiple = TRUE),
+                        checkboxInput("is.paired", "Is your data paired-end?", value = TRUE),
+                        actionButton("start_file_input", "Proceed to file input"))
+             ),
+             mainPanel(
+               uiOutput("barcode_locations_image"))
+           ),
+           
+           titlePanel("File Selection: "),
+           
+           h4("Fastqs:"),
+           sidebarLayout(sidebarPanel(fluidRow(class = "Fixed_input_row_75",
+                                               column(6, hidden(textOutput("fastq_R1_note"))),
+                                               column(6, hidden(shinyFilesButton("fastq_R1", "R1 Fastq(s)", title = "Select R1 Fastq file(s)", multiple = TRUE)))),
+                                      fluidRow(class = "Fixed_input_row_75",
+                                               column(6, hidden(textOutput("fastq_R2_note"))),
+                                               column(6, hidden(shinyFilesButton("fastq_R2", "R2 Fastq(s)", title = "Select R2 Fastq file(s)", multiple = TRUE)))),
+                                      fluidRow(class = "Fixed_input_row_75",
+                                               column(6, hidden(textOutput("fastq_R3_note"))),
+                                               column(6, hidden(shinyFilesButton("fastq_R3", "R3 Fastq(s)", title = "Select R3 Fastq file(s)", multiple = TRUE))))),
+                         mainPanel(htmlOutput("fastq_files_report"))
+           ),
+           
+           h4("Barcodes:"),
+           sidebarLayout(sidebarPanel(fluidRow(class = "Fixed_input_row_75",
+                                               column(6, hidden(textOutput("barcode_file_1_note"))),
+                                               column(6, hidden(shinyFilesButton("barcode_file_1", "Barcode 1", title = "Select file containing barcodes", multiple = FALSE)))),
+                                      fluidRow(class = "Fixed_input_row_75",
+                                               column(6, hidden(textOutput("barcode_file_2_note"))),
+                                               column(6, hidden(shinyFilesButton("barcode_file_2", "Barcode 2", title = "Select file containing barcodes", multiple = FALSE))))),
+                         mainPanel(htmlOutput("barcode_files_report"))
+           ),
+           
+           
+           hidden(shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = FALSE, 
+                                   title = "Tab delimited key for demultiplexed samples. Two or three columns for: seperate fastq file barcodes, header/in-read barcodes, and sample name.")
+           ),
+           actionButton("go_demultiplex", "Demultiplex reads!")
   ),
   
-  titlePanel("File Selection: "),
-  
-  h4("Fastqs:"),
-  sidebarLayout(sidebarPanel(fluidRow(class = "Fixed_input_row_75",
-                                      column(6, hidden(textOutput("fastq_R1_note"))),
-                                      column(6, hidden(shinyFilesButton("fastq_R1", "R1 Fastq(s)", title = "Select R1 Fastq file(s)", multiple = TRUE)))),
-                             fluidRow(class = "Fixed_input_row_75",
-                                      column(6, hidden(textOutput("fastq_R2_note"))),
-                                      column(6, hidden(shinyFilesButton("fastq_R2", "R2 Fastq(s)", title = "Select R2 Fastq file(s)", multiple = TRUE)))),
-                             fluidRow(class = "Fixed_input_row_75",
-                                      column(6, hidden(textOutput("fastq_R3_note"))),
-                                      column(6, hidden(shinyFilesButton("fastq_R3", "R3 Fastq(s)", title = "Select R3 Fastq file(s)", multiple = TRUE))))),
-    mainPanel(htmlOutput("fastq_files_report"))
-  ),
-  
-  h4("Barcodes:"),
-  sidebarLayout(sidebarPanel(fluidRow(class = "Fixed_input_row_75",
-                                      column(6, hidden(textOutput("barcode_file_1_note"))),
-                                      column(6, hidden(shinyFilesButton("barcode_file_1", "Barcode 1", title = "Select file containing barcodes", multiple = FALSE)))),
-                             fluidRow(class = "Fixed_input_row_75",
-                                      column(6, hidden(textOutput("barcode_file_2_note"))),
-                                      column(6, hidden(shinyFilesButton("barcode_file_2", "Barcode 2", title = "Select file containing barcodes", multiple = FALSE))))),
-                mainPanel(htmlOutput("barcode_files_report"))
-  ),
-  
-  
-  hidden(shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = FALSE, 
-                   title = "Tab delimited key for demultiplexed samples. Two or three columns for: seperate fastq file barcodes, header/in-read barcodes, and sample name.")
-  ),
-  actionButton("go_demultiplex", "Demultiplex reads!"),
   
   #===============pre-demultiplexed input============
-  actionButton("input_pre_demultiplexed", "I have pre-demultiplexed fastq files!"),
   hidden(tags$div(id = "pre_demulti_input_panel",
                   inputPanel(
                     column(12,
@@ -80,7 +83,40 @@ ui <- fluidPage(
                                                      label = "Alignment Method", 
                                                      choices = c("reference", "denovo"), 
                                                      selected = character())),
-                                 hidden(uiOutput("alignment_panel"))),
+                                 hidden(tags$div(id = "denovo_paired_input_panel",
+                                                 fluidRow(inputPanel(
+                                                   numericInput("M", "M, the number of mismatches allowed between alignments within individuals", 3, 1, step = 1),
+                                                   numericInput("n", "n, the number of mismatches allowed between alignments between individuals", 3, 1, step = 1),
+                                                   checkboxInput("check_headers", "Check that fastq headers are STACKS acceptable. If you are sure they are OK, uncheck this.", value = TRUE),
+                                                   checkboxInput("stacks_cleanup", "Clean-up accessory files after completion.", value = TRUE),
+                                                   numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+                                                   checkboxInput("rmdup", "Remove PCR duplicates?", value = TRUE),
+                                                   checkboxInput("rmimp", "Remove improperly paired reads? This should usually be FALSE.", value = FALSE),
+                                                   numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+                                                 )))),
+                                 hidden(tags$div(id = "denovo_single_input_panel",
+                                                 fluidRow(inputPanel(
+                                                   numericInput("M", "M, the number of mismatches allowed between alignments within individuals", 3, 1, step = 1),
+                                                   numericInput("n", "n, the number of mismatches allowed between alignments between individuals", 3, 1, step = 1),
+                                                   checkboxInput("check_headers", "Check that fastq headers are STACKS acceptable. If you are sure they are OK, uncheck this.", value = TRUE),
+                                                   checkboxInput("stacks_cleanup", "Clean-up accessory files after completion.", value = TRUE),
+                                                   numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+                                                   numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+                                                 )))),
+                                 hidden(tags$div(id = "reference_paired_input_panel",
+                                                 fluidRow(inputPanel(
+                                                   hidden(shinyFilesButton("reference_genome", "Select Reference Genome", title = "Select Reference Genome", multiple = FALSE)),
+                                                   numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+                                                   checkboxInput("rmdup", "Remove PCR duplicates?", value = TRUE),
+                                                   checkboxInput("rmimp", "Remove improperly paired reads?", value = TRUE),
+                                                   numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+                                                 )))),
+                                 hidden(tags$div(id = "reference_single_input_panel",
+                                                 fluidRow(inputPanel(
+                                                   hidden(shinyFilesButton("reference_genome", "Select Reference Genome", title = "Select Reference Genome", multiple = FALSE)),
+                                                   numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
+                                                   numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+                                                 ))))),
                         tabPanel("Demultiplexed File Report", 
                                  fluidRow(column(6, 
                                                  uiOutput("demultiplexed_files_report_RA")),
@@ -88,7 +124,7 @@ ui <- fluidPage(
                                           column(6, 
                                                  uiOutput("demultiplexed_files_report_RB")))))
   )
-  
+  #============end UI================
 )
 
 
@@ -451,6 +487,7 @@ server <- function(input, output, session) {
   # show panel only if pre_demultiplexed file input is selected
   observeEvent(input$input_pre_demultiplexed,{
     toggle("pre_demulti_input_panel")
+    toggle("demultiplexing")
     toggle("pre_existing_RA") # no reason to do it this way, but if I don't I get doubled inputs, and this works...
   })
   
@@ -543,49 +580,27 @@ server <- function(input, output, session) {
   
   #==========run alignment============================
   # generate the alignment panel based on denovo or reference, paired or unpaired inputs
-  output$alignment_panel <- renderUI({
-    
-    validate(need(input$alignment_radio %in% c("denovo", "reference"), message = "Please select an alignment method."))
+  observeEvent(input$alignment_radio,{
+    hide("denovo_paired_input_panel")
+    hide("denovo_single_input_panel")
+    hide("reference_paired_input_panel")
+    hide("reference_single_input_panel")
+
     if(input$alignment_radio == "denovo"){
-      if(length(x$demultiplexed_files) == 2){
-        fluidRow(inputPanel(
-          numericInput("M", "M, the number of mismatches allowed between alignments within individuals", 3, 1, step = 1),
-          numericInput("n", "n, the number of mismatches allowed between alignments between individuals", 3, 1, step = 1),
-          checkboxInput("check_headers", "Check that fastq headers are STACKS acceptable. If you are sure they are OK, uncheck this.", value = TRUE),
-          checkboxInput("stacks_cleanup", "Clean-up accessory files after completion.", value = TRUE),
-          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
-          checkboxInput("rmdup", "Remove PCR duplicates?", value = TRUE),
-          checkboxInput("rmimp", "Remove improperly paired reads? This should usually be FALSE.", value = FALSE),
-          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
-        ))
+      if(length(x$files$demultiplexed_files) == 2){
+        show("denovo_paired_input_panel")
       }
       else{
-        fluidRow(inputPanel(
-          numericInput("M", "M, the number of mismatches allowed between alignments within individuals", 3, 1, step = 1),
-          numericInput("n", "n, the number of mismatches allowed between alignments between individuals", 3, 1, step = 1),
-          checkboxInput("check_headers", "Check that fastq headers are STACKS acceptable. If you are sure they are OK, uncheck this.", value = TRUE),
-          checkboxInput("stacks_cleanup", "Clean-up accessory files after completion.", value = TRUE),
-          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
-          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
-        ))
+        show("denovo_single_input_panel")
       }
     }
     else if(input$alignment_radio == "reference"){
-      if(length(x$demultiplexed_files) == 2){
-        fluidRow(inputPanel(
-          shinyFilesButton("reference_genome", "Select Reference Genome", title = "Select Reference Genome", multiple = FALSE),
-          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
-          checkboxInput("rmdup", "Remove PCR duplicates?", value = TRUE),
-          checkboxInput("rmimp", "Remove improperly paired reads?", value = TRUE),
-          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
-        ))
+      show("reference_genome")
+      if(length(x$files$demultiplexed_files) == 2){
+        show("reference_paired_input_panel")
       }
       else{
-        fluidRow(inputPanel(
-          shinyFilesButton("reference_genome", "Select Reference Genome", title = "Select Reference Genome", multiple = FALSE),
-          numericInput("mapQ", "mapQ, minumum acceptable mapping quality score", 5, min = 0, step = 1),
-          numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
-        ))
+        show("reference_single_input_panel")
       }
     }
   })
@@ -599,6 +614,9 @@ server <- function(input, output, session) {
   observeEvent(input$alignment_radio, ignoreInit = TRUE,{
     show("alignment_panel")
   })
+  
+  
+  
 } 
 
 shinyApp(ui, server)
