@@ -58,13 +58,20 @@ ui <- fluidPage(
   ),
   
   
-  textOutput("file_name_header"),
-  uiOutput("demultiplex_options"),
+  hidden(shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = FALSE, 
+                   title = "Tab delimited key for demultiplexed samples. Two or three columns for: seperate fastq file barcodes, header/in-read barcodes, and sample name.")
+  ),
   actionButton("go_demultiplex", "Demultiplex reads!"),
   
-  
+  #===============pre-demultiplexed input============
   actionButton("input_pre_demultiplexed", "I have pre-demultiplexed fastq files!"),
-  hidden(uiOutput("pre_demulti_input_panel")),
+  hidden(tags$div(id = "pre_demulti_input_panel",
+                  inputPanel(
+                    column(12,
+                           checkboxInput("is.paired.pre.existing", "Is your data paired-end?", value = TRUE),
+                           hidden(shinyFilesButton("pre_existing_RA", label = "RA Files", multiple = TRUE, title = "Select RA Reads")),
+                           hidden(shinyFilesButton("pre_existing_RB", label = "RB Files", multiple = TRUE, title = "Select RB Reads")),
+                           hidden(actionButton("parse_pre_existing_demultiplexed", "Read In Demultiplexed Files")))))),
   #===============Alignment============
   titlePanel("Alignment"),
   mainPanel(tabsetPanel(type = "tabs",
@@ -89,6 +96,7 @@ ui <- fluidPage(
 
 
 server <- function(input, output, session) {
+  shinyFileChoose(input, id = "test", root = c(root))
   
   #==========read in input files for demultiplexing===========
   x <- reactiveValues(files = list(), 
@@ -108,6 +116,23 @@ server <- function(input, output, session) {
     
     img <- img_table$img[which(img_table$input %in% input$barcodes)]
     return(img)
+  })
+  
+  # remove input buttons and inputs if barcode status changes
+  observeEvent(input$barcodes,{
+    hide("fastq_R1")
+    hide("fastq_R2")
+    hide("fastq_R3")
+    hide("barcode_file_1")
+    hide("barcode_file_2")
+    hide("fastq_R1_note")
+    hide("fastq_R2_note")
+    hide("fastq_R3_note")
+    hide("barcode_file_1_note")
+    hide("barcode_file_2_note")
+    x$files_are_good <- 0
+    x$files <- list()
+    x$files_report <- list()
   })
   
   # generate images
@@ -309,14 +334,7 @@ server <- function(input, output, session) {
     x$files <- files
   })
   
-  # take sample IDs
-  output$demultiplex_options <- renderUI({
-    sib <- shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = FALSE, 
-                            title = "Tab delimited key for demultiplexed samples. Two or three columns for: seperate fastq file barcodes, header/in-read barcodes, and sample name.")
-    hidden(sib)
-  })
-  
-  output$file_name_header <- renderText("Demultiplexing Options:")
+
   
   # generate reports on barcode and fastq files
   output$barcode_files_report <- renderUI({
@@ -336,22 +354,22 @@ server <- function(input, output, session) {
       show("fastq_files_report")
       show("sample_ids")
       show("go_demultiplex", asis = TRUE)
-      show("file_name_header", asis = TRUE)
     }
     else{
       hide("barcode_files_report")
       hide("fastq_files_report")
       hide("go_demultiplex")
-      hide("file_name_header")
       hide("sample_ids")
     }
   })
   shinyFileChoose(input, 'sample_ids', root=c(root))
 
   # import and note that we have sample ids if we do
-  observeEvent(input$sample_ids,{
-    x$files$sample_ids <- .parse_shinyFiles_path(root, input$sample_ids)
-    x$have_sample_ids <- 1
+  observeEvent(is.list(input$sample_ids), ignoreInit = TRUE,{
+    if(is.list(input$sample_ids)){
+      x$files$sample_ids <- .parse_shinyFiles_path(root, input$sample_ids)
+      x$have_sample_ids <- 1
+    }
   })
   
   #==========run demultiplexing======================
@@ -429,18 +447,11 @@ server <- function(input, output, session) {
   
   #==========import existing demultiplexed reads==============
   # panel layout
-  output$pre_demulti_input_panel <- renderUI({
-      inputPanel(
-        column(12,
-               checkboxInput("is.paired.pre.existing", "Is your data paired-end?", value = TRUE),
-               shinyFilesButton("pre_existing_RA", label = "RA Files", multiple = TRUE, title = "Select RA Reads"),
-               hidden(shinyFilesButton("pre_existing_RB", label = "RB Files", multiple = TRUE, title = "Select RB Reads")),
-               hidden(actionButton("parse_pre_existing_demultiplexed", "Read In Demultiplexed Files"))))
-  })
   
   # show panel only if pre_demultiplexed file input is selected
   observeEvent(input$input_pre_demultiplexed,{
     toggle("pre_demulti_input_panel")
+    toggle("pre_existing_RA") # no reason to do it this way, but if I don't I get doubled inputs, and this works...
   })
   
   observeEvent(input$is.paired.pre.existing,{
