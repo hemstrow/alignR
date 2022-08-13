@@ -43,7 +43,25 @@
     report_demulti$RB <- c(report_fastq, paste0("RB fastq file: ", files$RB))
   }
   
-  out <- list(fastq = report_fastq, barcode = report_barcode, demulti = report_demulti)
+  report_reference <- character()
+  if("reference_genome" %in% names(files)){
+    report_reference <- c(report_reference, paste0("Reference Genome: ", files$reference_genome))
+  }
+  
+  bam_report <- character()
+  if("alignments" %in% names(files)){
+    bam_report <- c(bam_report, files$alignments)
+  }
+  
+  report_paralog_reference <- character()
+  if("paralog_reference" %in% names(files)){
+    report_paralog_reference <- c(report_paralog_reference, files$paralog_reference)
+  }
+  
+  out <- list(fastq = report_fastq, barcode = report_barcode, 
+              demulti = report_demulti, reference = report_reference,
+              alignments = bam_report,
+              paralog_reference = report_paralog_reference)
   
   return(out)
 }
