@@ -1,4 +1,8 @@
 .parse_shinyFiles_path <- function(root, input_obj){
+  if(!is.list(input_obj)){
+    return(NULL)
+  }
+  
   out <- character(length(input_obj[[1]]))
   
   for(i in 1:length(input_obj[[1]])){
@@ -15,7 +19,7 @@
   return(out)
 }
 
-.fastq_file_reporter <- function(files){
+.fastq_file_reporter <- function(files, rename_R3 = FALSE){
   report_fastq <- character()
   if("R1" %in% names(files)){
     report_fastq <- c(report_fastq, paste0("R1 fastq file: ", files$R1))
@@ -24,7 +28,12 @@
     report_fastq <- c(report_fastq, paste0("R2 fastq file: ", files$R2))
   }
   if("R3" %in% names(files)){
-    report_fastq <- c(report_fastq, paste0("R3 fastq file: ", files$R3))
+    if(rename_R3){
+      report_fastq <- c(report_fastq, paste0("R2 fastq file: ", files$R3))
+    }
+    else{
+      report_fastq <- c(report_fastq, paste0("R3 fastq file: ", files$R3))
+    }
   }
   
   report_barcode <- character()
@@ -36,12 +45,15 @@
   }
   
   report_demulti <- list()
-  if("RA" %in% names(files)){
-    report_demulti$RA <- c(report_fastq, paste0("RA fastq file: ", files$RA))
+  if("demultiplexed_files" %in% names(files)){
+    if("RA" %in% names(files$demultiplexed_files)){
+      report_demulti$RA <- c(report_fastq, paste0("RA fastq file: ", files$demultiplexed_files$RA))
+    }
+    if("RB" %in% names(files$demultiplexed_files)){
+      report_demulti$RB <- c(report_fastq, paste0("RB fastq file: ", files$demultiplexed_files$RB))
+    }
   }
-  if("RB" %in% names(files)){
-    report_demulti$RB <- c(report_fastq, paste0("RB fastq file: ", files$RB))
-  }
+  
   
   report_reference <- character()
   if("reference_genome" %in% names(files)){

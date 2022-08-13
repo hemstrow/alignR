@@ -1,18 +1,18 @@
 library(shiny)
 library(shinyjs)
 library(shinyFiles)
+library(alignR)
 source("app_code.R")
 
-root <- c(wd = normalizePath("."), root = "/", home = normalizePath("~"))
+root <- c(wd = normalizePath("."), root = "/", home = normalizePath("~"), test = normalizePath("/mnt/c/Users/Will/Documents/GitHub/temp/"))
 
 # things to add: Show head of .fastq files and barcodes once selected
 
 ui <- navbarPage(
   useShinyjs(),
   
-  tags$head(tags$style("
-      .Fixed_input_row_75{height:75px;}"
-  )),
+  tags$head(tags$style(".Fixed_input_row_75{height:75px;}"),
+            tags$style(".Fixed_input_row_150{height:150px;}")),
   
   #===============Demultiplexing and initial inputs===============
   tabPanel(title = "Demultiplexing",
@@ -72,12 +72,18 @@ ui <- navbarPage(
            
            # pre-demultiplexed input
            hidden(tags$div(id = "pre_demulti_input_panel",
-                           inputPanel(
-                             column(12,
-                                    checkboxInput("is.paired.pre.existing", "Is your data paired-end?", value = TRUE),
-                                    hidden(shinyFilesButton("pre_existing_RA", label = "RA Files", multiple = TRUE, title = "Select RA Reads")),
-                                    hidden(shinyFilesButton("pre_existing_RB", label = "RB Files", multiple = TRUE, title = "Select RB Reads")),
-                                    hidden(actionButton("parse_pre_existing_demultiplexed", "Read In Demultiplexed Files"))))))
+                           sidebarLayout(
+                             sidebarPanel = sidebarPanel(
+                               class = "Fixed_input_row_150",
+                               width = 4,
+                               column(12,
+                                      checkboxInput("is.paired.pre.existing", "Is your data paired-end?", value = TRUE),
+                                      hidden(shinyFilesButton("pre_existing_RA", label = "RA Files", multiple = TRUE, title = "Select RA Reads")),
+                                      hidden(shinyFilesButton("pre_existing_RB", label = "RB Files", multiple = TRUE, title = "Select RB Reads")),
+                                      hidden(actionButton("parse_pre_existing_demultiplexed", "Continue to alignment!")))),
+                             mainPanel = mainPanel(
+                               width = 8,
+                               fluidRow(column(6,htmlOutput("pre_fastq_files_report_RA")), column(6,hidden(htmlOutput("pre_fastq_files_report_RB"))))))))
   ),
   
   
@@ -224,14 +230,37 @@ ui <- navbarPage(
 
 
 server <- function(input, output, session) {
-  show("rf")
-  #==========read in input files for demultiplexing===========
+  
+  #==========constant observers and initializations==========
+  # initialize reactives
   x <- reactiveValues(files = list(), 
                       files_report = list(), 
                       files_are_good = 0, 
                       have_sample_ids = 0,
                       demultiplexed = 0,
-                      aligned = 0)
+                      aligned = 0,
+                      rename_r2 = 0,
+                      paired = TRUE)
+  
+  # file reporter
+  observeEvent(x$files,{
+    x$files_report <- .fastq_file_reporter(x$files, x$rename_r2)
+  })
+  
+  # paired sync
+  observe({
+    updateCheckboxInput(session, "is.paired.pre.existing", value = input$is.paired)
+    isolate(x$paired <- input$is.paired)
+  })
+  observe({
+    updateCheckboxInput(session, "is.paired", value = input$is.paired.pre.existing)
+    isolate(x$paired <- input$is.paired)
+  })
+  
+  
+  show("rf")
+  #==========read in input files for demultiplexing===========
+  
   
   # figure out which images we need
   barcode.type <- eventReactive(input$barcodes,{
@@ -259,9 +288,9 @@ server <- function(input, output, session) {
     hide("barcode_file_1_note")
     hide("barcode_file_2_note")
     x$files_are_good <- 0
-    x$files <- list()
-    x$files_report <- list()
   })
+  
+  
   
   # generate images
   output$barcode_locations_image <- renderUI({
@@ -320,7 +349,7 @@ server <- function(input, output, session) {
   observeEvent(input$barcodes, ignoreInit = TRUE, {
     x$files_are_good <- 0
   })
-  observeEvent(input$is.paired, ignoreInit = TRUE, {
+  observeEvent(x$paired, ignoreInit = TRUE, {
     x$files_are_good <- 0
   })
   
@@ -361,7 +390,7 @@ server <- function(input, output, session) {
        show("barcode_file_1")
      }
      
-     if(input$is.paired){
+     if(x$paired){
        if(length(input$barcodes) != 0){
          show("fastq_R2")
          show("fastq_R2_note")
@@ -391,15 +420,23 @@ server <- function(input, output, session) {
    }
   })
   
-  # locate appropriate files
+  # locate appropriate files, update reporter, check if we are good to proceed based on files and barcode status.
   observeEvent(eventExpr = 
                  is.list(input$fastq_R1) | 
                  is.list(input$fastq_R2) | 
                  is.list(input$fastq_R3) | 
                  is.list(input$barcode_file_1) | 
                  is.list(input$barcode_file_2), ignoreInit = TRUE, handlerExpr = {
-    display <- FALSE
-    files <- list()
+    
+    files <- lapply(list(R1 = input$fastq_R1, 
+                         R2 = input$fastq_R2, 
+                         R3 = input$fastq_R3, 
+                         barcode_file_1 = input$barcode_file_1, 
+                         barcode_file_2 = input$barcode_file_2), 
+                    function(x) .parse_shinyFiles_path(root, x))
+    
+    files <- purrr::discard(files, is.null)
+    x$rename_r2 <- 0
     
 
     # read files for every case:
@@ -407,35 +444,23 @@ server <- function(input, output, session) {
     if(("In Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes) & is.list(input$barcode_file_1) & is.list(input$fastq_R1)){
 
       # not paired, dual indexed
-      if(!input$is.paired & "Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$barcode_file_2)){
-        files$barcode_file_1 <- .parse_shinyFiles_path(root, input$barcode_file_1)
-        files$barcode_file_2 <- .parse_shinyFiles_path(root, input$barcode_file_2)
-        files$R1 <- .parse_shinyFiles_path(root, input$fastq_R1)
-        files$R2 <- .parse_shinyFiles_path(root, input$fastq_R2)
+      if(!x$paired & "Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$barcode_file_2)){
         x$files_are_good <- 1
       }
       
       # paired, dual indexed
-      else if(input$is.paired & "Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$fastq_R3) & is.list(input$barcode_file_2)){
-        files$barcode_file_1 <- .parse_shinyFiles_path(root, input$barcode_file_1)
-        files$barcode_file_2 <- .parse_shinyFiles_path(root, input$barcode_file_2)
-        files$R1 <- .parse_shinyFiles_path(root, input$fastq_R1)
-        files$R2 <- .parse_shinyFiles_path(root, input$fastq_R2)
-        files$R3 <- .parse_shinyFiles_path(root, input$fastq_R3)
+      else if(x$paired & "Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$fastq_R3) & is.list(input$barcode_file_2)){
         x$files_are_good <- 1
       }
       
       # not paired, single indexed
-      else if(!input$is.paired & !"Seperate fastq File" %in% input$barcodes){
-        files$barcode_file_1 <- .parse_shinyFiles_path(root, input$barcode_file_1)
-        files$R1 <- .parse_shinyFiles_path(root, input$fastq_R1)
+      else if(!x$paired & !"Seperate fastq File" %in% input$barcodes){
         x$files_are_good <- 1
       }
       
-      else if(input$is.paired & !"Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2)){
-        files$barcode_file_1 <- .parse_shinyFiles_path(root, input$barcode_file_1)
-        files$R1 <- .parse_shinyFiles_path(root, input$fastq_R1)
-        files$R3 <- .parse_shinyFiles_path(root, input$fastq_R2) # named R3 for consistancy later
+      else if(x$paired & !"Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2)){
+        names(files)[which(names(files) == "R2")] <- "R3" # renamed R3 for consistency later, since this is reverse reads not barcodes
+        x$rename_r2 <- 1
         x$files_are_good <- 1
       }
     }
@@ -443,18 +468,14 @@ server <- function(input, output, session) {
     ## with only R2 barcodes
     else if(!("In Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes) & is.list(input$barcode_file_1) & is.list(input$fastq_R1)){
       # not paired
-      if(!input$is.paired){
-        files$barcode_file_1 <- .parse_shinyFiles_path(root, input$barcode_file_1)
-        files$R1 <- .parse_shinyFiles_path(root, input$fastq_R1)
-        files$R2 <- .parse_shinyFiles_path(root, input$fastq_R2)
+      if(!x$paired){
         x$files_are_good <- 1
       }
       
       # paired
-      if(input$is.paired & is.list(input$fastq_R2)){
-        files$barcode_file_1 <- .parse_shinyFiles_path(root, input$barcode_file_1)
-        files$R1 <- .parse_shinyFiles_path(root, input$fastq_R1)
-        files$R3 <- .parse_shinyFiles_path(root, input$fastq_R2)
+      if(x$paired & is.list(input$fastq_R2)){
+        names(files)[which(names(files) == "R2")] <- "R3" # renamed R3 for consistency later, since this is reverse reads not barcodes
+        x$rename_r2 <- 1
         x$files_are_good <- 1
       }
     }
@@ -475,19 +496,12 @@ server <- function(input, output, session) {
   # show or hide reports and 'go' buttons based on inputs
   observeEvent(x$files_are_good, {
     if(x$files_are_good){
-      x$files_report <- .fastq_file_reporter(x$files)
-      
-      
-      show("barcode_files_report")
-      show("fastq_files_report")
       show("sample_ids")
       show("go_demultiplex", asis = TRUE)
     }
     else{
-      hide("barcode_files_report")
-      hide("fastq_files_report")
-      hide("go_demultiplex")
       hide("sample_ids")
+      hide("go_demultiplex")
     }
   })
   shinyFileChoose(input, 'sample_ids', root=c(root))
@@ -503,6 +517,9 @@ server <- function(input, output, session) {
   #==========run demultiplexing======================
   # demultiplex
   observeEvent(input$go_demultiplex,{
+    have_indices <- FALSE
+    
+    browser()
     if(x$files_are_good){
       if("Seperate fastq File" %in% input$barcodes){
         
@@ -513,12 +530,14 @@ server <- function(input, output, session) {
           indices <- readLines(x$barcode_file_1)
         }
         
-        if(input$is.paired){
+        if(x$paired){
           R2 <- x$files$R2
         }
         else{
           R2 <- NULL
         }
+        
+        have_indices <- TRUE
         
         x$files$plate_split_files <- plate_split(R1 = x$files$R1, 
                                                  R2 = R2,
@@ -541,7 +560,7 @@ server <- function(input, output, session) {
         }
         
         # fill R2
-        if(input$is.paired){
+        if(x$paired){
           if("Seperate fastq File" %in% input$barcodes){
             R2 <- x$files$plate_split_files$R3
           }
@@ -561,6 +580,17 @@ server <- function(input, output, session) {
           sample_names <- NULL
         }
         
+        if(length(R1) != 1){
+          if(have_indices){
+            prefixes <- paste0("alignR_gui_demultiplex_", indices)
+          }
+          else{
+            prefixes <- paste0("alignR_gui_demultiplex_", basename(tools::file_path_sans_ext(R1)))
+            prefixes <- gsub("R1", "", prefixes)
+            prefixes <- gsub("__", "_", prefixes)
+          }
+        }
+        
         
         x$files$demultiplexed_files <- demultiplex(R1 = R1,
                                                    R2 = R2,
@@ -575,8 +605,6 @@ server <- function(input, output, session) {
   })
   
   #==========import existing demultiplexed reads==============
-  # panel layout
-  
   # show panel only if pre_demultiplexed file input is selected
   observeEvent(input$input_pre_demultiplexed,{
     toggle("pre_demulti_input_panel")
@@ -584,8 +612,9 @@ server <- function(input, output, session) {
     toggle("pre_existing_RA") # no reason to do it this way, but if I don't I get doubled inputs, and this works...
   })
   
-  observeEvent(input$is.paired.pre.existing,{
+  observeEvent(x$paired, {
     toggle("pre_existing_RB")
+    toggle("pre_fastq_files_report_RB")
     hide("denovo_paired_input_panel")
     hide("denovo_single_input_panel")
     hide("reference_paired_input_panel")
@@ -609,7 +638,7 @@ server <- function(input, output, session) {
     
     
     
-    if(input$is.paired.pre.existing){
+    if(x$paired){
       if(is.list(input$pre_existing_RA) & is.list(input$pre_existing_RB)){
         show("parse_pre_existing_demultiplexed")
       }
@@ -627,34 +656,54 @@ server <- function(input, output, session) {
     }
   })
   
+  
+  
   shinyFileChoose(input, 'pre_existing_RA', root=c(root))
   shinyFileChoose(input, 'pre_existing_RB', root=c(root))
   
   # parse in files
-  observeEvent(eventExpr = input$parse_pre_existing_demultiplexed,
-               ignoreInit = TRUE, handlerExpr = {
-                 x$files$demultiplexed_files <- NULL # clear out any others that have been previously entered.
-                 
-                 x$demultiplexed <- 0
-                 if(input$is.paired.pre.existing){
-                   if(is.list(input$pre_existing_RA) & is.list(input$pre_existing_RB)){
-                     RA <- .parse_shinyFiles_path(root, input$pre_existing_RA)
-                     RB <- .parse_shinyFiles_path(root, input$pre_existing_RB)
-                     
-                     validate(need(length(RA) == length(RB), message = "An equal number of RA and RB files must be provided."))
-                     
+  observeEvent(is.list(input$pre_existing_RA) |
+                 is.list(input$pre_existing_RB), ignoreInit = TRUE, ignoreNULL = TRUE,{
+                   x$files$demultiplexed_files <- NULL
+                   
+                   RA <- .parse_shinyFiles_path(root, input$pre_existing_RA)
+                   RB <- .parse_shinyFiles_path(root, input$pre_existing_RB)
+                   
+                   if(is.null(RB) & !is.null(RA)){
+                     x$files$demultiplexed_files <- list(RA = .parse_shinyFiles_path(root, input$pre_existing_RA))
+                   }
+                   else if(!is.null(RB) & !is.null(RA)){
                      x$files$demultiplexed_files <- vector("list", 2)
                      names(x$files$demultiplexed_files) <- c("RA", "RB")
                      x$files$demultiplexed_files$RA <- RA
                      x$files$demultiplexed_files$RB <- RB
+                   }
+                   
+                 })
+  
+  
+  output$pre_fastq_files_report_RA <- renderUI({
+    lapply(x$files_report$demulti$RA, p)
+  })
+  output$pre_fastq_files_report_RB <- renderUI({
+    lapply(x$files_report$demulti$RB, p)
+  })
+  
+  # check if we can proceed
+  observeEvent(eventExpr = input$parse_pre_existing_demultiplexed,
+               ignoreInit = TRUE, handlerExpr = {
+                 
+                 x$demultiplexed <- 0
+                 if(x$paired){
+                   if(is.list(input$pre_existing_RA) & is.list(input$pre_existing_RB)){
+                     
+                     validate(need(length(x$files$demultiplexed_files$RA) == length(x$files$demultiplexed_files$RB), message = "An equal number of RA and RB files must be provided."))
                      
                      x$demultiplexed <- 1
                    }
                  }
                  else{
                    if(is.list(input$pre_existing_RA)){
-                     x$files$demultiplexed_files <- list(RA = .parse_shinyFiles_path(root, input$pre_existing_RA))
-                     
                      x$demultiplexed <- 1
                    }
                  }
@@ -679,13 +728,16 @@ server <- function(input, output, session) {
   # show or hide reporters
   observeEvent(x$demultiplexed, ignoreInit = TRUE, {
     if(x$demultiplexed){
-      x$files_report$demulti <- .fastq_file_reporter(x$files$demultiplexed_files)$demulti
-      
       
       show("demultiplexed_files_report_RA")
-      show("demultiplexed_files_report_RB")
       show("alignment_method")
       
+      if(x$paired){
+        show("demultiplexed_files_report_RB")
+      }
+      else{
+        hide("demultiplexed_files_report_RB")
+      }
     }
     else{
       hide("demultiplexed_files_report_RA")
@@ -709,7 +761,7 @@ server <- function(input, output, session) {
     hide("run_alignment")
 
     if(input$alignment_method == "denovo"){
-      if(length(x$files$demultiplexed_files) == 2){
+      if(x$paired){
         show("denovo_paired_input_panel")
       }
       else{
@@ -717,7 +769,7 @@ server <- function(input, output, session) {
       }
     }
     else if(input$alignment_method == "reference"){
-      if(length(x$files$demultiplexed_files) == 2){
+      if(x$paired){
         show("reference_paired_input_panel")
         show("reference_genome")
       }
@@ -739,7 +791,7 @@ server <- function(input, output, session) {
     hide("run_alignment")
     if(x$demultiplexed){
       if(input$alignment_method == "reference"){
-        if(length(x$files$demultiplexed_files) == 2 & is.list(input$reference_genome)){
+        if(x$paired & is.list(input$reference_genome)){
           x$files$reference_genome <- .parse_shinyFiles_path(root, input$reference_genome)
           show("run_alignment")
         }
@@ -759,9 +811,8 @@ server <- function(input, output, session) {
     hide("reference_files_report")
     hide("reference_files_report1")
     if(!is.null(x$files$reference_genome)){
-      x$files_report$reference <- .fastq_file_reporter(x$files)$reference
-      
-      if(length(x$files$demultiplexed_files) == 2){
+
+      if(x$paired){
         output$reference_files_report <- renderText(x$files_report$reference)
         show("reference_files_report")
       }
@@ -777,27 +828,55 @@ server <- function(input, output, session) {
     x$aligned <- 0
     x$files$alignments <- list()
     if(input$alignment_method == "denovo"){
-      x$files$alignments <- align_denovo(RA_fastqs = x$files$demultiplexed_files$RA,
-                                         RB_fastqs = x$files$demultiplexed_files$RB, 
-                                         M = input$M, 
-                                         n = input$n, 
-                                         par = input$par,
-                                         check_headers = input$check_headers,
-                                         stacks_cleanup = input$stacks_cleanup, 
-                                         re_align = TRUE,
-                                         mapQ = input$mapQ, 
-                                         remove_duplicates = input$rmdup,
-                                         remove_improper_pairs = input$rmimp)
+      if(x$paired){
+        x$files$alignments <- align_denovo(RA_fastqs = x$files$demultiplexed_files$RA,
+                                           RB_fastqs = x$files$demultiplexed_files$RB, 
+                                           M = input$M, 
+                                           n = input$n, 
+                                           par = input$par,
+                                           check_headers = input$check_headers,
+                                           stacks_cleanup = input$stacks_cleanup, 
+                                           re_align = TRUE,
+                                           mapQ = input$mapQ, 
+                                           remove_duplicates = input$rmdup,
+                                           remove_improper_pairs = input$rmimp)
+      }
+      else{
+        x$files$alignments <- align_denovo(RA_fastqs = x$files$demultiplexed_files$RA,
+                                           RB_fastqs = NULL, 
+                                           M = input$M, 
+                                           n = input$n, 
+                                           par = input$par,
+                                           check_headers = input$check_headers,
+                                           stacks_cleanup = input$stacks_cleanup, 
+                                           re_align = TRUE,
+                                           mapQ = input$mapQ, 
+                                           remove_duplicates = input$rmdup,
+                                           remove_improper_pairs = input$rmimp)
+      }
+      
       x$aligned <- 1
     }
     else if(input$alignment_method == "reference"){
-      x$files$alignments <- align_reference(RA_fastqs = x$files$demultiplexed_files$RA,
-                                            RB_fastqs = x$files$demultiplexed_files$RB,
-                                            reference = x$files$reference_genome, 
-                                            remove_duplicates = input$rmdup, 
-                                            mapQ = input$mapQ, 
-                                            remove_improper_pairs = input$rmimp, 
-                                            par = input$par)
+      if(x$paired){
+        x$files$alignments <- align_reference(RA_fastqs = x$files$demultiplexed_files$RA,
+                                              RB_fastqs = x$files$demultiplexed_files$RB,
+                                              reference = x$files$reference_genome, 
+                                              remove_duplicates = input$rmdup, 
+                                              mapQ = input$mapQ, 
+                                              remove_improper_pairs = input$rmimp, 
+                                              par = input$par)
+      }
+      else{
+        x$files$alignments <- align_reference(RA_fastqs = x$files$demultiplexed_files$RA,
+                                              RB_fastqs = NULL,
+                                              reference = x$files$reference_genome, 
+                                              remove_duplicates = input$rmdup, 
+                                              mapQ = input$mapQ, 
+                                              remove_improper_pairs = input$rmimp, 
+                                              par = input$par)
+      }
+      
       x$aligned <- 1
     }
     updateTabsetPanel(session, "MainTabs", "Genotyping")
@@ -833,7 +912,6 @@ server <- function(input, output, session) {
   observeEvent(x$aligned,{
     hide("aligned_files_report")
     if(x$aligned == 1){
-      x$files_report$alignments <- .fastq_file_reporter(x$files)$alignments
       show("aligned_files_report")
     }
   })
@@ -867,10 +945,10 @@ server <- function(input, output, session) {
   })
   
   # report on paralog reference
-  observeEvent(x$files$paralog_reference, ignoreNULL = TRUE, ignoreInit = TRUE,{
-    x$files_report$paralog_reference <- .fastq_file_reporter(x$files)$paralog_reference
+  observeEvent(x$files_report$paralog_reference, ignoreNULL = TRUE, ignoreInit = TRUE,{
+    output$paralog_reference_files_report <- renderText(x$files_report$paralog_reference)
   })
-  output$paralog_reference_files_report <- renderText(x$files_report$paralog_reference)
+  
   
   # show or hide the run button
   # observe({
