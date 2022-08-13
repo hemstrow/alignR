@@ -1,9 +1,10 @@
-if ($#ARGV == 4){
+if ($#ARGV == 5){
         $file1 = $ARGV[0];
         $file2 = $ARGV[1];
         $barcode = $ARGV[2];
         $prefix = $ARGV[3];
         $stacks_header = $ARGV[4];
+        $barcode_in_header = $ARGV[5];
 }
 else {
         print "Incorrect number of arguments provided.\n";
@@ -39,6 +40,19 @@ while (<FILE1>){
         $f2b = <FILE2>;
         $f2c = <FILE2>;
         $f2d = <FILE2>;
+        
+        # grab barcodes
+        if($barcode_in_header){
+          @bc1 = split(/:/, $f1a);
+          $bc1 = @bc[$#bc];
+          
+          @bc2 = split(/:/, $f2a);
+          $bc2 = @bc2[$#bc2];
+        }
+        else{
+          $bc1 = substr($f1b,0,$barcode_length);
+          $bc2 = substr($f2b,0,$barcode_length);
+        }
         
         # fix headers to stacks style if requested
         if ($stacks_header){
@@ -84,33 +98,42 @@ while (<FILE1>){
             $f2a = $equi . "/" . 2 ."\n";
           }
         }
-
-        # demultiplex
-        $bc1 = substr($f1b,0,$barcode_length);
-        $bc2 = substr($f2b,0,$barcode_length);
-
+        
         if ($hash_r1{$bc1} ne "" && $hash_r1{$bc2} eq ""){
-
-                $f1b_2 = substr($f1b, $barcode_length, length($f1b));
-                $f1d_2 = substr($f1d, $barcode_length, length($f1d));
-
+          
                 $out1 = $hash_r1{$bc1};
                 $out2 = $hash_r2{$bc1};
-
-                print $out1 $f1a . $f1b_2 . $f1c . $f1d_2;
-                print $out2 $f2a . $f2b . $f2c . $f2d;
+                
+                if($barcode_in_header){
+                  print $out1 $f1a . $f1b . $f1c . $f1d;
+                  print $out2 $f2a . $f2b . $f2c . $f2d;
+                }
+                else{
+                  $f1b_2 = substr($f1b, $barcode_length, length($f1b));
+                  $f1d_2 = substr($f1d, $barcode_length, length($f1d));
+                  
+                  print $out1 $f1a . $f1b_2 . $f1c . $f1d_2;
+                  print $out2 $f2a . $f2b . $f2c . $f2d;
+                }
+                
 
         }
         elsif ($hash_r1{$bc1} eq "" && $hash_r1{$bc2} ne ""){
-
-                $f2b_2 = substr($f2b, $barcode_length, length($f2b));
-                $f2d_2 = substr($f2d, $barcode_length, length($f2d));
-
+          
                 $out1 = $hash_r1{$bc2};
                 $out2 = $hash_r2{$bc2};
+                
+                if($barcode_in_header){
+                  print $out1 $f2a . $f2b . $f2c . $f2d;
+                  print $out2 $f1a . $f1b . $f1c . $f1d;
+                }
+                else{
+                  $f2b_2 = substr($f2b, $barcode_length, length($f2b));
+                  $f2d_2 = substr($f2d, $barcode_length, length($f2d));
 
-                print $out1 $f2a . $f2b_2 . $f2c . $f2d_2;
-                print $out2 $f1a . $f1b . $f1c . $f1d;
+                  print $out1 $f2a . $f2b_2 . $f2c . $f2d_2;
+                  print $out2 $f1a . $f1b . $f1c . $f1d;
+                }
 
         }
         elsif ($hash_r1{$bc1} ne "" && $hash_r1{$bc2} ne ""){
