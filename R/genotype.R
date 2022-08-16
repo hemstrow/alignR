@@ -228,6 +228,18 @@ genotype_bams <- function(bamfiles,
     local_doVcf <- FALSE
   }
   
+  dir <- dirname(bamfiles[1])
+  outfile <- file.path(dir, outfile_prefix)
+  
+  if(unzip){
+    output_filename <- paste0(outfile, ".geno")
+    if(file.exists(output_filename)){
+      msg <- c(msg, paste0("File: ", output_filename, "already exists. Genotyping not run.\n"))
+    }
+  }
+  
+  
+  
   if(length(msg) > 0){
     stop(msg)
   }
@@ -235,8 +247,7 @@ genotype_bams <- function(bamfiles,
   
   
 
-  dir <- dirname(bamfiles[1])
-  outfile <- file.path(dir, outfile_prefix)
+  
 
   #==============prepare to run=================
   old.scipen <- options("scipen")
@@ -276,8 +287,8 @@ genotype_bams <- function(bamfiles,
                   minMapQ,
                   outfile,
                   ifelse(angsd_doVcf, 1, 0),
-                  ifelse(file.exists(rf), 1, 0),
-                  ifelse(file.exists(rf), rf, "NA"),
+                  ifelse(!isFALSE(rf), 1, 0),
+                  ifelse(!isFALSE(rf), rf, "NA"),
                   par), collapse = " ")
                 )
 

@@ -37,8 +37,15 @@ fi
 samtools index ${c1}.sort.flt.bam
 
 # clean
+if [[ $rmdup -eq 1 ]]
+  rm ${c1}.markdup.bam
+fi
 
-# rm ${c1}.fixmate.bam
-# rm ${c1}.q1.bam
-# rm ${c1}.psort.bam
-# rm ${c1}.namesort.bam
+if [[ $improperpair -eq 1 ]]
+  ${c1}.flt.bam
+fi
+
+rm ${c1}.fixmate.bam
+rm ${c1}.q1.bam
+rm ${c1}.psort.bam
+rm ${c1}.namesort.bam

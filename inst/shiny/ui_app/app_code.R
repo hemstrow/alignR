@@ -70,10 +70,35 @@
     report_paralog_reference <- c(report_paralog_reference, files$paralog_reference)
   }
   
+  report_paralog_pops <- character()
+  if("filter_paralogs_pops" %in% names(files)){
+    report_paralog_pops <- c( report_paralog_pops, files$filter_paralogs_pops)
+  }
+  
+  report_sample_ids <- character()
+  if("sample_ids" %in% names(files)){
+    report_sample_ids <- c(report_sample_ids, files$sample_ids)
+  }
+  
+  report_rf <- character()
+  if("rf" %in% names(files)){
+    report_rf <- c(report_rf, files$rf)
+  }
+  
+  report_genotypes <- character()
+  if("genotypes" %in% names(files)){
+    report_genotypes <- c(report_genotypes, files$genotypes)
+  }
+  
   out <- list(fastq = report_fastq, barcode = report_barcode, 
               demulti = report_demulti, reference = report_reference,
               alignments = bam_report,
-              paralog_reference = report_paralog_reference)
+              paralog_reference = report_paralog_reference,
+              sample_ids = report_sample_ids,
+              filter_paralogs_pops = report_paralog_pops,
+              rf = report_rf,
+              genotypes = report_genotypes)
   
   return(out)
 }
+

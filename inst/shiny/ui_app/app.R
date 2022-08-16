@@ -1,6 +1,7 @@
 library(shiny)
 library(shinyjs)
 library(shinyFiles)
+library(shinybusy)
 library(alignR)
 source("app_code.R")
 
@@ -9,13 +10,13 @@ root <- c(wd = normalizePath("."), root = "/", home = normalizePath("~"), test =
 # things to add: Show head of .fastq files and barcodes once selected
 
 ui <- navbarPage(
-  useShinyjs(),
   
   tags$head(tags$style(".Fixed_input_row_75{height:75px;}"),
             tags$style(".Fixed_input_row_150{height:150px;}")),
   
   #===============Demultiplexing and initial inputs===============
   tabPanel(title = "Demultiplexing",
+           useShinyjs(), # here so it doesn't throw a warning, still works with every tab!
            titlePanel("Demultiplexing"),
            actionButton("input_pre_demultiplexed", "I have demultiplexed fastq files!"),
            
@@ -25,9 +26,9 @@ ui <- navbarPage(
                       sidebarPanel(
                         fluidRow(selectizeInput("barcodes", 
                                                 "Where are your barcodes located?", 
-                                                choices = list("In Headers",
+                                                choices = list("Headers",
                                                                "Start of Reads",
-                                                               "Seperate fastq File"), 
+                                                               "R2 fastq file"), 
                                                 options = list(maxItems = 2),
                                                 multiple = TRUE),
                                  checkboxInput("is.paired", "Is your data paired-end?", value = TRUE),
@@ -62,11 +63,11 @@ ui <- navbarPage(
                                   mainPanel(htmlOutput("barcode_files_report"))
                     ),
                     
-                    
-                    hidden(shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = FALSE, 
-                                            title = "Tab delimited key for demultiplexed samples. Two or three columns for: seperate fastq file barcodes, header/in-read barcodes, and sample name.")
-                    ),
-                    actionButton("go_demultiplex", "Demultiplex reads!")
+                    numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+                    sidebarLayout(sidebarPanel(hidden(shinyFilesButton("sample_ids", label = "Optional Sample Identifications", multiple = TRUE, 
+                                                                       title = "Tab delimited key(s) for demultiplexed samples, one per fastq input file. Two or three columns for: sample IDs, R2 fastq file barcodes, header/in-read barcodes, in that order."))),
+                                  mainPanel(htmlOutput("sample_ids_files_report"))),
+                    uiOutput("go_demultiplex")
            ),
            
            
@@ -138,23 +139,20 @@ ui <- navbarPage(
                                                            ))),
                                                            mainPanel = mainPanel(hidden(textOutput("reference_files_report1")))))),
                                          
-                                         hidden(actionButton("run_alignment", "Run Alignment!")),
-                                ),
+                                         hidden(actionButton("run_alignment", "Run Alignment!"))),
+                                
                                 # pre-existing alignments
                                 hidden(tags$div(id = "pre_alignments_input_panel",
                                                 inputPanel(
                                                   column(12,
-                                                         hidden(shinyFilesButton("pre_existing_alignments", label = "Select Alignments", multiple = TRUE, title = "Select Alignments (.bam files)")),
-                                                         hidden(actionButton("parse_pre_existing_alignments", "Read In Alignment Files"))))))
-                                
-                       ),
+                                                         hidden(shinyFilesButton("pre_existing_alignments", label = "Select Alignments", multiple = TRUE, title = "Select Alignments (.bam files)"))))))),
+                       
                        tabPanel("Demultiplexed File Report", 
                                 fluidRow(column(6, 
                                                 hidden(uiOutput("demultiplexed_files_report_RA"))),
                                          
                                          column(6, 
-                                                hidden(uiOutput("demultiplexed_files_report_RB")))))
-           )
+                                                hidden(uiOutput("demultiplexed_files_report_RB"))))))
   ),
   
   #==============Genotyping===============
@@ -195,26 +193,37 @@ ui <- navbarPage(
                                 
                                 
                                 hidden(tags$div(id = "paralog_filter_menu",
-                                                inputPanel(
+                                                sidebarLayout(
                                                   
                                                   # paralog options
+                                                  sidebarPanel = sidebarPanel(
+                                                    h3("Paralog filtering options:"),
+                                                    numericInput("filter_paralogs_alpha", "p-value cuttoff for a site to be considered a paralog", 
+                                                                 value = 0.0016, min = 1e-12, max = .5),
+                                                    numericInput("filter_paralogs_buffer", "Number of bp to exclude from genotyping on either side of a paralog",
+                                                                 value = 1000, min = 1, max = 1000000, step = 1),
+                                                    hidden(shinyFilesButton("paralog_reference", title = "Select the reference genome to which reads were aligned (if denovo, select the constructed denovo reference)", 
+                                                                            label = "Select the reference genome", multiple = FALSE)),
+                                                    hidden(shinyFilesButton("filter_paralogs_pops", label = "Optional poulation ID file", title = "Select a file containing population IDs for each alignment.", multiple = FALSE))),
                                                   
-                                                  numericInput("filter_paralogs_alpha", "p-value cuttoff for a site to be considered a paralog", 
-                                                               value = 0.0016, min = 1e-12, max = .5),
-                                                  numericInput("filter_paralogs_buffer", "Number of bp to exclude from genotyping on either side of a paralog",
-                                                               value = 1000, min = 1, max = 1000000, step = 1),
-                                                  hidden(shinyFilesButton("paralog_reference", "Select the reference genome to which reads were aligned (if denovo, select the constructed denovo reference)", 
-                                                                          title = "Select the reference genome", multiple = FALSE))))),
+                                                  # reports
+                                                  mainPanel = mainPanel(
+                                                    hidden(uiOutput("paralog_reference_files_report")),
+                                                    hidden(uiOutput("filter_paralogs_pops_files_report")))))),
                                 
                                 # general options
-                                inputPanel(
-                                  column(12,
-                                         hidden(shinyFilesButton("rf", "Optional: select a file containing regions of the reference/denovo genome to include during genotyping.", # no reason to hide--I'm going to show immediately, but I get the double entry error if I don't
-                                                                 title = "Select a file containing regions of the reference/denovo genome to include", multiple = FALSE)),
-                                         numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1))),
-                       
-                       # run
-                       hidden(actionButton("run_genotyping", "Run Genotyping!"))),
+                                sidebarLayout(
+                                  sidebarPanel = sidebarPanel(width = 5,
+                                                              hidden(shinyFilesButton("rf", "Optional file of gemonic regions to include.", # no reason to hide--I'm going to show immediately, but I get the double entry error if I don't
+                                                                                      title = "Select a file containing regions of the reference/denovo genome to include", multiple = FALSE))),
+                                  mainPanel = mainPanel(width = 7,
+                                                        uiOutput("rf_files_report"))),
+                                
+                                numericInput("par", label = "Number of parallel processing threads:", value = 1, min = 1, max = parallel::detectCores(), step = 1),
+                                
+                                # run
+                                sidebarLayout(sidebarPanel = sidebarPanel(uiOutput("run_genotyping")),
+                                              mainPanel = mainPanel(uiOutput("genotypes_files_report")))),
   
   
   tabPanel("Alignment File Report", 
@@ -240,7 +249,8 @@ server <- function(input, output, session) {
                       demultiplexed = 0,
                       aligned = 0,
                       rename_r2 = 0,
-                      paired = TRUE)
+                      paired = TRUE,
+                      genotyped = 0)
   
   # file reporter
   observeEvent(x$files,{
@@ -264,9 +274,9 @@ server <- function(input, output, session) {
   
   # figure out which images we need
   barcode.type <- eventReactive(input$barcodes,{
-    img_table <- data.frame(input = c("In Headers",
+    img_table <- data.frame(input = c("Headers",
                                       "Start of Reads",
-                                      "Seperate fastq File"),
+                                      "R2 fastq file"),
                             img = c("barcode_in_header", 
                                     "barcode_in_read", 
                                     "barcode_in_r2"))
@@ -295,7 +305,7 @@ server <- function(input, output, session) {
   # generate images
   output$barcode_locations_image <- renderUI({
     res <- list()
-    validate(need(!all(c("Start of Reads", "In Headers") %in% input$barcodes), "Barcodes can be either in fastq headers OR at the beginning of reads, but not both!"))
+    validate(need(!all(c("Start of Reads", "Headers") %in% input$barcodes), "Barcodes can be either in fastq headers OR at the beginning of reads, but not both!"))
     photo_size <- 300
     if(length(barcode.type()) > 1){
       photo_size <- photo_size - 50*(length(barcode.type()) - 1)
@@ -357,7 +367,7 @@ server <- function(input, output, session) {
   ## define consistant notes
   output$fastq_R1_note <- renderText("Forward read files (R1):")
   output$fastq_R3_note <- renderText("Reverse read files (R3):")
-  output$barcode_file_2_note <- renderText("Barcodes matching R2 (seperate fastq file barcodes):")
+  output$barcode_file_2_note <- renderText("Barcodes matching R2 (R2 fastq file barcodes):")
   
   ## define others and show appropriate
   observeEvent(eventExpr = input$start_file_input, handlerExpr = {
@@ -372,15 +382,15 @@ server <- function(input, output, session) {
     hide("barcode_file_1_note")
     hide("barcode_file_2_note")
     
-   if(!all(c("Start of Reads", "In Headers") %in% input$barcodes)){
+   if(!all(c("Start of Reads", "Headers") %in% input$barcodes)){
      if(length(input$barcodes) != 0){
        show("fastq_R1")
        show("fastq_R1_note")
      }
      
      
-     if("In Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes){
-       if("In Headers" %in% input$barcodes){
+     if("Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes){
+       if("Headers" %in% input$barcodes){
          output$barcode_file_1_note <- renderText("Header barcodes:")
        }
        else{
@@ -396,7 +406,7 @@ server <- function(input, output, session) {
          show("fastq_R2_note")
        }
        
-       if("Seperate fastq File" %in% input$barcodes){
+       if("R2 fastq file" %in% input$barcodes){
          output$fastq_R2_note <- renderText("Barcode reads (R2):")
          
          show("fastq_R3_note")
@@ -408,7 +418,7 @@ server <- function(input, output, session) {
          output$fastq_R2_note <- renderText("Reverse read files (R2):")
        }
      }
-     else if("Seperate fastq File" %in% input$barcodes){
+     else if("R2 fastq file" %in% input$barcodes){
        output$barcode_file_2_note <- renderText("R2 barcodes:")
        output$fastq_R2_note <- renderText("Barcode reads (R2):")
        
@@ -441,24 +451,24 @@ server <- function(input, output, session) {
 
     # read files for every case:
     ## with in-line or header barcodes
-    if(("In Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes) & is.list(input$barcode_file_1) & is.list(input$fastq_R1)){
+    if(("Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes) & is.list(input$barcode_file_1) & is.list(input$fastq_R1)){
 
       # not paired, dual indexed
-      if(!x$paired & "Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$barcode_file_2)){
+      if(!x$paired & "R2 fastq file" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$barcode_file_2)){
         x$files_are_good <- 1
       }
       
       # paired, dual indexed
-      else if(x$paired & "Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$fastq_R3) & is.list(input$barcode_file_2)){
+      else if(x$paired & "R2 fastq file" %in% input$barcodes & is.list(input$fastq_R2) & is.list(input$fastq_R3) & is.list(input$barcode_file_2)){
         x$files_are_good <- 1
       }
       
       # not paired, single indexed
-      else if(!x$paired & !"Seperate fastq File" %in% input$barcodes){
+      else if(!x$paired & !"R2 fastq file" %in% input$barcodes){
         x$files_are_good <- 1
       }
       
-      else if(x$paired & !"Seperate fastq File" %in% input$barcodes & is.list(input$fastq_R2)){
+      else if(x$paired & !"R2 fastq file" %in% input$barcodes & is.list(input$fastq_R2)){
         names(files)[which(names(files) == "R2")] <- "R3" # renamed R3 for consistency later, since this is reverse reads not barcodes
         x$rename_r2 <- 1
         x$files_are_good <- 1
@@ -466,7 +476,7 @@ server <- function(input, output, session) {
     }
     
     ## with only R2 barcodes
-    else if(!("In Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes) & is.list(input$barcode_file_1) & is.list(input$fastq_R1)){
+    else if(!("Headers" %in% input$barcodes | "Start of Reads" %in% input$barcodes) & is.list(input$barcode_file_1) & is.list(input$fastq_R1)){
       # not paired
       if(!x$paired){
         x$files_are_good <- 1
@@ -493,6 +503,7 @@ server <- function(input, output, session) {
     lapply(x$files_report$fastq, p)
   })
   
+  
   # show or hide reports and 'go' buttons based on inputs
   observeEvent(x$files_are_good, {
     if(x$files_are_good){
@@ -508,96 +519,91 @@ server <- function(input, output, session) {
 
   # import and note that we have sample ids if we do
   observeEvent(is.list(input$sample_ids), ignoreInit = TRUE,{
+    hide("sample_ids_files_report")
     if(is.list(input$sample_ids)){
       x$files$sample_ids <- .parse_shinyFiles_path(root, input$sample_ids)
       x$have_sample_ids <- 1
+      show("sample_ids_files_report")
     }
   })
+  
+  output$sample_ids_files_report <- renderUI({
+    lapply(c("Warning: Input R1/R2/R3 and sample names must all be in the same order! Check before continuing!", x$files_report$sample_ids), p)
+  })
+  
+  
+  # render the go_demultiplex button here to do some validation.
+  output$go_demultiplex <- renderUI({
+    
+    length_prob <- 0
+    if("R2" %in% names(x$files)){
+      if(length(x$files$R2) != length(x$files$R1)){length_prob <- 1}
+    }
+    if("R3" %in% names(x$files)){
+      if(length(x$files$R3) != length(x$files$R1)){length_prob <- 1}
+    }
+    if("sample_ids" %in% names(x$files)){
+      if(length(x$files$R1) != length(x$files$sample_ids)){length_prob <- 1}
+    }
+    
+    validate(need(expr = length_prob == 0, label = "The number of R1/R2/R3 files must be equal, as must the number of sample ID files if provided."))
+    
+    return(actionButton("go_demultiplex", "Demultiplex reads!"))
+  })
+  
   
   #==========run demultiplexing======================
   # demultiplex
   observeEvent(input$go_demultiplex,{
     have_indices <- FALSE
     
-    browser()
     if(x$files_are_good){
-      if("Seperate fastq File" %in% input$barcodes){
         
-        if(length(input$barcodes) > 1){
-          indices <- readLines(x$files$barcode_file_2)
-        }
-        else{
-          indices <- readLines(x$barcode_file_1)
-        }
-        
-        if(x$paired){
-          R2 <- x$files$R2
-        }
-        else{
-          R2 <- NULL
-        }
-        
-        have_indices <- TRUE
-        
-        x$files$plate_split_files <- plate_split(R1 = x$files$R1, 
-                                                 R2 = R2,
-                                                 R3 = x$files$R3, 
-                                                 indices = indices,
-                                                 outfile_prefix = "alignR_gui_plate_split")
-        if(length(input$barcodes) == 1){
-          x$files$demultiplexed_files <- x$files$plate_split_files
-          x$files$plate_split_files <- NULL
-        }
+      if(length(input$barcodes) > 1){
+        indices <- readLines(x$files$barcode_file_2)
+        barcodes <- readLines(x$files$barcode_file_1)
+      }
+      else if("R2 fastq file" %in% x$barcode_file_1){
+        indices <- readLines(x$barcode_file_1)
+        barcodes <- NULL
+      }
+      else{
+        indices <- NULL
+        barcodes <- readLines(x$barcode_file_1)
       }
       
-      if(any(c("In Headers", "Start of Reads") %in% input$barcodes)){
-        # fill R1
-        if("Seperate fastq File" %in% input$barcodes){
-          R1 <- x$files$plate_split_files$R1
-        }
-        else{
-          R1 <- x$files$R1
-        }
-        
-        # fill R2
-        if(x$paired){
-          if("Seperate fastq File" %in% input$barcodes){
-            R2 <- x$files$plate_split_files$R3
-          }
-          else{
-            R2 <- x$files$R3
-          }
-        }
-        else{
-          R2 <- NULL
-        }
-        
-        # fill sample_names
-        if(x$have_sample_ids){
-          sample_names <- readLines(x$files$sample_ids)
-        }
-        else{
-          sample_names <- NULL
-        }
-        
-        if(length(R1) != 1){
-          if(have_indices){
-            prefixes <- paste0("alignR_gui_demultiplex_", indices)
-          }
-          else{
-            prefixes <- paste0("alignR_gui_demultiplex_", basename(tools::file_path_sans_ext(R1)))
-            prefixes <- gsub("R1", "", prefixes)
-            prefixes <- gsub("__", "_", prefixes)
-          }
-        }
-        
-        
-        x$files$demultiplexed_files <- demultiplex(R1 = R1,
-                                                   R2 = R2,
-                                                   sample_names = sample_names,
-                                                   barcodes = readLines(x$files$barcode_file_1),
-                                                   outfile_prefix = "alignR_gui_demultiplex")
+      if(x$paired){
+        R3 <- x$files$R3
       }
+      else{
+        R3 <- NULL
+      }
+      
+      if(x$have_sample_ids){
+        sample_names <- vector("list", length = length(x$files$sample_ids))
+        for(i in 1:length(sample_names)){
+          sample_names[[i]] <- read.table(x$files$sample_ids[i], headers = FALSE)
+        }
+      }
+      else{
+        sample_names <- NULL
+      }
+      
+      barcode_key <- data.frame(input = c("R2 fastq file", "Start of Reads", "Headers"),
+                                option = c("R2", "read_start", "header"))
+      barcode_locations <- barcode_key$option[match(input$barcodes, barcode_key$input)]
+      
+      show_modal_spinner(spin = "circle", color = "#9e5157", text = "Demultiplexing, please wait...")
+      x$files$demultiplexed_files <- demultiplex(R1 = x$files$R1, 
+                                                 R2 = x$files$R2,
+                                                 R3 = R3,  
+                                                 barcode_locations = barcode_locations,
+                                                 indices = indices, 
+                                                 barcodes = barcodes,
+                                                 sample_names = sample_names,
+                                                 outfile_prefix = "alignR_gui_demulti",
+                                                 par = input$par)
+      remove_modal_spinner()
       
       x$demultiplexed <- 1
       updateTabsetPanel(session, "MainTabs", "Alignment")
@@ -827,6 +833,7 @@ server <- function(input, output, session) {
   observeEvent(input$run_alignment,{
     x$aligned <- 0
     x$files$alignments <- list()
+    show_modal_spinner(spin = "circle", color = "#9e5157", text = "Aligning, please wait...")
     if(input$alignment_method == "denovo"){
       if(x$paired){
         x$files$alignments <- align_denovo(RA_fastqs = x$files$demultiplexed_files$RA,
@@ -879,6 +886,8 @@ server <- function(input, output, session) {
       
       x$aligned <- 1
     }
+    
+    remove_modal_spinner()
     updateTabsetPanel(session, "MainTabs", "Genotyping")
   })
   
@@ -893,13 +902,11 @@ server <- function(input, output, session) {
   
   # import alignments
   observeEvent(is.list(input$pre_existing_alignments), ignoreInit = TRUE, {
-    hide("parse_pre_existing_alignments")
     x$aligned <- 0
     
     if(is.list(input$pre_existing_alignments)){
       x$files$alignments <- .parse_shinyFiles_path(root, input$pre_existing_alignments)
       x$aligned <- 1
-      show("parse_pre_existing_alignments")
       updateTabsetPanel(session, "MainTabs", "Genotyping")
     }
   })
@@ -919,6 +926,7 @@ server <- function(input, output, session) {
   
   #==========prep for genotyping===========
   shinyFileChoose(input, "paralog_reference", root = root)
+  shinyFileChoose(input, "filter_paralogs_pops", root = root)
   shinyFileChoose(input, "rf", root = root)
   
   # show or hide the paralog filtering menu
@@ -927,10 +935,12 @@ server <- function(input, output, session) {
     if(input$filter_paralogs){
       show("paralog_filter_menu")
       show("paralog_reference")
+      show("filter_paralogs_pops")
     }
     else{
       hide("paralog_filter_menu")
       hide("paralog_reference")
+      hide("filter_paralogs_pops")
     }
     
   })
@@ -946,20 +956,136 @@ server <- function(input, output, session) {
   
   # report on paralog reference
   observeEvent(x$files_report$paralog_reference, ignoreNULL = TRUE, ignoreInit = TRUE,{
-    output$paralog_reference_files_report <- renderText(x$files_report$paralog_reference)
+    output$paralog_reference_files_report <- renderText(paste0("Reference for paralog filtering: ", x$files_report$paralog_reference))
+  })
+  
+  # save the paralog pops if provided
+  observeEvent(is.list(input$filter_paralogs_pops), ignoreInit = TRUE, {
+    hide("filter_paralogs_pops_files_report")
+    if(is.list(input$filter_paralogs_pops)){
+      x$files$filter_paralogs_pops <- .parse_shinyFiles_path(root, input$filter_paralogs_pops)
+      show("filter_paralogs_pops_files_report")
+    }
+  })
+  
+  # report on paralog pops
+  observeEvent(x$files_report$filter_paralogs_pops, ignoreNULL = TRUE, ignoreInit = TRUE,{
+    output$filter_paralogs_pops_files_report <- renderText(paste0("Pop ID file: ", x$files_report$filter_paralogs_pops))
   })
   
   
-  # show or hide the run button
-  # observe({
-  #   hide("run_genotyping")
-  #   if(x$aligned){
-  #     if(input$filter_paralogs){
-  #       
-  #     }
-  # 
-  #   }
-  # })
+  # generate minInd selector
+  output$minInd <- renderUI({
+    validate(need(!is.null(x$files$alignments), message = FALSE))
+    max_val <- length(x$files$alignments)
+    init <- floor(max_val/2)
+    return(numericInput("minInd", "Minimum number of genotyped individuals per locus.", value = init, max = max_val, min = 0, step = 1))
+  })
+  
+  # save the rf if provided
+  observeEvent(is.list(input$rf), {
+    hide("rf_files_report")
+    if(is.list(input$rf)){
+      x$files$rf <- .parse_shinyFiles_path(root, input$rf)
+      show("rf_files_report")
+    }
+  })
+  
+  # report on rf
+  observeEvent(x$files_report$rf, ignoreNULL = TRUE, ignoreInit = TRUE,{
+    output$rf_files_report <- renderText(paste0("Region file: ", x$files_report$rf))
+  })
+  
+  # make the run_genotyping button here for validation
+  output$run_genotyping <- renderUI({
+    if(x$aligned){
+      if(input$filter_paralogs){
+        
+        if(!is.null(x$files$paralog_reference)){
+          if(!file.exists(x$files$paralog_reference)){
+            validate(need(FALSE, "Could not locate paralog reference file"))
+          }
+        }
+        else{
+          validate(need(FALSE, "Please provide reference genome for paralog filtering."))
+        }
+        
+        if(!is.null(x$files$filter_paralog_pops)){
+          if(!file.exists(x$files$paralog_reference)){
+            validate(need(FALSE, "Could not locate paralog pops file"))
+          }
+          else{
+            validate(need(length(readLines(x$files$filter_paralogs_pops)) == length(x$files$alignments),
+                     "The filter paralogs populations file must have the same number of lines (samples) as the number of alignments."))
+          }
+        }
+      }
+    }
+    
+    else{
+      validate(need(FALSE, "Please provide alignments!"))
+    }
+    
+    
+    return(actionButton("run_genotyping", "Run Genotyping!"))
+  })
+  
+  #===============run genotyping==================
+  observeEvent(input$run_genotyping,{
+    show_modal_spinner(spin = "circle", color = "#9e5157", text = "Genotyping, please wait...")
+    if(is.null(x$files$rf)){
+      rf <- FALSE
+    }
+    else{
+      rf <- x$files$rf
+    }
+    
+    if(!is.null(x$files$filter_paralogs_pops)){
+      filter_paralogs_pops <- x$files$filter_paralogs_pops
+    }
+    else{
+      filter_paralogs_pops <- rep("only_pop", length(x$files$alignments))
+    }
+    
+    if(!is.null(x$files$paralog_reference)){
+      paralog_reference <- readLines(x$files$paralog_reference)
+    }
+    else{
+      paralog_reference <- FALSE
+    }
+    
+    x$files$genotypes <- genotype_bams(x$files$alignments,
+                                       outfile_prefix = "alignR_gui_genotypes", 
+                                       minInd = input$minInd, 
+                                       SNP_pval = input$SNP_pval, 
+                                       doGeno = input$doGeno, 
+                                       genotyper = input$genotyper, 
+                                       postCutoff = input$postCutoff, 
+                                       minQ = input$minQg, 
+                                       minMapQ = input$minMapQ, 
+                                       unzip = input$unzip, 
+                                       doVcf = input$doVcf, 
+                                       filter_paralogs = input$filter_paralogs, 
+                                       filter_paralogs_alpha = input$filter_paralogs_alpha, 
+                                       filter_paralogs_buffer = input$filter_paralogs_buffer,
+                                       filter_paralogs_populations = filter_paralogs_pops, 
+                                       filter_paralogs_reference = paralog_reference,
+                                       rf = rf, 
+                                       par = input$par)
+    
+    remove_modal_spinner()
+    x$genotyped <- 1
+  })
+  
+  #===============generate final report===========
+  # report on genotypes
+  observeEvent(x$files_report$genotypes, ignoreNULL = TRUE, ignoreInit = TRUE,{
+    hide("genotypes_files_report")
+    output$genotypes_files_report <- renderText(paste0("Final Genotypes File: ", x$files_report$genotypes))
+    if(length(x$files_report$genotypes) > 0){
+      show("genotypes_files_report")
+    }
+  })
   
 } 
 
