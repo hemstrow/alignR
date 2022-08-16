@@ -2,35 +2,65 @@
 % Please edit documentation in R/demultiplex.R
 \name{demultiplex}
 \alias{demultiplex}
-\title{Split multiplexed reads with sample barcodes.}
+\title{Split multiplexed reads via barcodes.}
 \usage{
 demultiplex(
   R1,
   R2 = NULL,
-  barcodes,
+  R3 = NULL,
+  barcodes = NULL,
+  indices = NULL,
+  barcode_locations,
   outfile_prefix = "alignR",
   sample_names = NULL,
-  stacks_header = TRUE
+  stacks_header = TRUE,
+  par = 1
 )
 }
 \arguments{
-\item{R1}{character. File name for R1 (read one) file.}
+\item{R1}{character vector. File name(s) for R1 (forward read) file(s).}
 
-\item{R2}{character, default NULL. File name for R2 (read one) file. If NULL,
-assumes data is single-end.}
+\item{R2}{character vector, default NULL. File name(s) for R2 (barcode) read
+file(s). Needed if barcodes are located on a separate read.}
 
-\item{barcodes}{character. Vector of barcodes to search for in read files.}
+\item{R3}{character vector, default NULL. File name(s) for the R3 (reverse
+read) file(s). If NULL, assumes the data is single-end.}
+
+\item{barcodes}{character. Vector of \emph{header or start-of-read} barcodes
+or file path to file containing such with one barcode on each line. Needed
+if either the \code{read_start} or \code{header} \code{barcode_location}
+options are selected.}
+
+\item{indices}{character. Vector of \emph{R2, seperate read} barcodes or file
+path to file containing such with one barcode on each line. Needed if 
+the \code{R2} \code{barcode_location} option is selected.}
+
+\item{barcode_locations}{character. String indicating the locations of
+barcodes. Options: \itemize{\item{\code{read_start}: } barcodes located at
+the start of each read. \item{\code{header}: } barcodes located in the
+fastq header for each read, after the final ":". \item{\code{R2}: }
+barcodes located in separate fastq files (usually named ending in "R2").
+Reads in these files contain \emph{only} the barcodes.} \code{R2} can be
+selected alongside either \code{header} or \code{read_start}. The latter
+two cannot currently be selected together.}
 
 \item{outfile_prefix}{character. Prefix to be appended to each resulting
-.fastq file. A vector can be provided if more than one R1/R2 files are also
-provided.}
+.fastq file.}
 
-\item{sample_names}{character. Vector of names for output files corresponding
-in order to the provided barcodes. Prefix and barcodes will in names will
-be replaced with these names. If more than one R1/R2 file is provided, a
-name for each barcode in each plate should be provided as a list in the
-same order as the R1/R2 files (for example, \code{list(c("plate1_sample1",
-"plate1_sample2"), c("plate2_sample1", "plate2_smaple2"))})}
+\item{sample_names}{Optional data.frame or list of data.frames. A data.frame
+for each input R1/R2/R3 file (so if 3 of each are provided, this should be
+a list of 3 data frames) with either two or three columns containing:
+\enumerate{\item Unique sample IDs \item barcodes provided to
+\code{indices} if \code{R2} \code{barcode_location} is selected, barcodes
+provided to \code{barcodes} otherwise. \item barcodes provided to
+\code{barcodes} if both \code{R2} and either \code{read_start} or
+\code{header} were selected for \code{barcode_location}.} In essence, the
+second column will hold indices if provided, which bumps barcodes into
+column three. The second column will otherwise hold barcodes. If multiple
+R1/R2/R3 files are provided, \emph{data.frames will be evaluated and
+matched to samples in order} (the first R1/R2/R3 file will correspond to
+the first data.frame and so on). \emph{Each barcode, index, or
+barcode/index combination must be present in each data.frame!}}
 
 \item{stacks_header}{logical, default TRUE. If TRUE, will fix fastq headers
 to be consistent with those expected by stacks (a unique header ending in
@@ -38,24 +68,30 @@ either /1 or /2 for read one and two, respectively). If FALSE, headers are
 not changed. Only applicable to paired-end sequence data.}
 
 \item{par}{numeric, default 1. Number of cores to use for the demultiplexing.
-Only used if more than one R1/R2 file are provided.}
+Only used if more than one R1/R2 file are or data is dual-indexed.}
 }
 \value{
-Generates files split by barcode in the directory of the R1 file(s),
-  named SAMPLENAME_RN.fastq or outfile_prefix_RN_BARCODE.fastq, if provided
-  with sample names or not, respectively, where N is A or B (for the reads
-  with and without barcodes, respectively). In R, returns a list containing
-  the paths to each output file.
+Generates files split by barcodes in the directory of the R1 file(s),
+  named SAMPLENAME_RN.fastq if \code{sample_names} are provided,
+  outfile_prefix_RN_BARCODE.fastq, outfile_prefix_RN_INDEX.fastq, or
+  outfile_prefix_RN_INDEX_RN_BARCODE.fastq if not, where N is either (1/2/3)
+  or (A/B) for reads split by R2 barcodes or start-of-read/headers,
+  respectively. R1 reads are forward reads, R2 reads are barcode reads, and
+  R3 reverse reads. RA reads had barcodes (that were trimmed by
+  \code{demultiplex}), RB reads did not. Returns a list containing the paths
+  to each output file.
 }
 \description{
-Splits paired-end sequencing .fastq files containing reads from multiple
-different plates with unique plate barcodes into different fastq files for
-each barcode. .fastq files must have barcode identifiers starting at the 5th
-base of sequence data.
+Splits paired-end or single-end, single or dual-indexed sequencing fastq
+files containing reads from multiple individuals.
 }
 \details{
-Currently, this only supports "strict" barcode matching without *any*
-sequence mismatches. Supports single- or paired-end sequence data.
+Currently, this only supports "strict" barcode matching without \emph{any}
+sequence mismatches. Supports single- or paired-end sequence data that is
+either dual- or single-indexed. Barcodes can be located either in a separate
+sequencing file (usually identified by the string "R2" somewhere in the file
+names), in the fastq headers (at the end of the header, following the final
+":"), or at the start of either the forward or reverse read.
 }
 \author{
 William Hemstrom
