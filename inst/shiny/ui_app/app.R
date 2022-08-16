@@ -139,13 +139,14 @@ ui <- navbarPage(
                                                            ))),
                                                            mainPanel = mainPanel(hidden(textOutput("reference_files_report1")))))),
                                          
-                                         hidden(actionButton("run_alignment", "Run Alignment!"))),
+                                         hidden(uiOutput("run_alignment"))),
                                 
                                 # pre-existing alignments
                                 hidden(tags$div(id = "pre_alignments_input_panel",
                                                 inputPanel(
                                                   column(12,
-                                                         hidden(shinyFilesButton("pre_existing_alignments", label = "Select Alignments", multiple = TRUE, title = "Select Alignments (.bam files)"))))))),
+                                                         hidden(shinyFilesButton("pre_existing_alignments", label = "Select Alignments", multiple = TRUE, title = "Select Alignments (.bam files)")),
+                                                         hidden(actionButton("continue_to_genotyping", "Continue to genotyping!"))))))),
                        
                        tabPanel("Demultiplexed File Report", 
                                 fluidRow(column(6, 
@@ -795,6 +796,7 @@ server <- function(input, output, session) {
   # check that we are good to go before offering the option. Using observe here because need to recheck whenever reference genomes change.
   observe({
     hide("run_alignment")
+    
     if(x$demultiplexed){
       if(input$alignment_method == "reference"){
         if(x$paired & is.list(input$reference_genome)){
@@ -811,6 +813,19 @@ server <- function(input, output, session) {
       }
     }
   })
+  
+  # define run_alignment (allow for validation)
+  
+  output$run_alignment <- renderUI({
+    validate(need(.check_system_install("bwa") & .check_system_install("samtools"), "No system install of bwa or samtools detected. Alignment disabled."))
+    
+    if(input$alignment_method == "denovo"){
+      validate(need(!isFALSE(.check_system_install("stacks")), "No system install of stacks detected. Denovo alignment disabled."))
+    }
+    
+    return(actionButton("run_alignment", "Run Alignment!"))
+  })
+  
   
   # generate reporter for the reference genome
   observeEvent(x$files$reference_genome, ignoreInit = TRUE, {
@@ -903,12 +918,17 @@ server <- function(input, output, session) {
   # import alignments
   observeEvent(is.list(input$pre_existing_alignments), ignoreInit = TRUE, {
     x$aligned <- 0
+    hide("continue_to_genotyping")
     
     if(is.list(input$pre_existing_alignments)){
       x$files$alignments <- .parse_shinyFiles_path(root, input$pre_existing_alignments)
       x$aligned <- 1
-      updateTabsetPanel(session, "MainTabs", "Genotyping")
+      show("continue_to_genotyping")
     }
+  })
+  
+  observeEvent(input$continue_to_genotyping, ignoreInit = TRUE,{
+    updateTabsetPanel(session, "MainTabs", "Genotyping")
   })
   
   #==========report on alignment=========================
@@ -1000,6 +1020,9 @@ server <- function(input, output, session) {
   output$run_genotyping <- renderUI({
     if(x$aligned){
       if(input$filter_paralogs){
+        validate(need(.check_system_install("ngsParalog"), "No ngsParalog installation detected. Genotyping with paralog filtering disabled."))
+        validate(need(.check_system_install("samtools"), "No samtools installation detected. Genotyping with paralog filtering disabled."))
+        
         
         if(!is.null(x$files$paralog_reference)){
           if(!file.exists(x$files$paralog_reference)){
@@ -1019,6 +1042,12 @@ server <- function(input, output, session) {
                      "The filter paralogs populations file must have the same number of lines (samples) as the number of alignments."))
           }
         }
+      }
+      
+      
+      validate(need(.check_system_install("angsd"), "No angsd installation detected. Genotyping disabled."))
+      if(input$doVcf & input$doGeno %in% c("all_posteriors", "called_posterior", "binary")){
+        validate(need(.check_system_install("bcftools"), "No bcftools installation detected. doVcf with non-numeric or allele identities output options disabled."))
       }
     }
     

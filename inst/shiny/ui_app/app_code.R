@@ -1,3 +1,6 @@
+.check_system_install <- function(code) as.logical(Sys.getenv(paste0(code, "_install")))
+
+
 .parse_shinyFiles_path <- function(root, input_obj){
   if(!is.list(input_obj)){
     return(NULL)
