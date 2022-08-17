@@ -17,6 +17,10 @@ Imports:
     dplyr,
     parallel,
     purrr,
+    shiny,
+    shinybusy,
+    shinyFiles,
+    shinyjs,
     stats,
     utils
 Depends:
