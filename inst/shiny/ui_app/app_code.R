@@ -47,15 +47,17 @@
     report_barcode <- c(report_barcode, paste0("Barcode/index file 2:", files$barcode_file_2))
   }
   
-  report_demulti <- list()
+  report_demulti <- vector("list", length = 2)
+  names(report_demulti) <- c("RA", "RB")
   if("demultiplexed_files" %in% names(files)){
     if("RA" %in% names(files$demultiplexed_files)){
-      report_demulti$RA <- c(report_fastq, paste0("RA fastq file: ", files$demultiplexed_files$RA))
+      report_demulti$RA <- c(report_demulti$RA, paste0("RA fastq file: ", files$demultiplexed_files$RA))
     }
     if("RB" %in% names(files$demultiplexed_files)){
-      report_demulti$RB <- c(report_fastq, paste0("RB fastq file: ", files$demultiplexed_files$RB))
+      report_demulti$RB <- c(report_demulti$RB, paste0("RB fastq file: ", files$demultiplexed_files$RB))
     }
   }
+  if(length(report_demulti$RB) == 0){report_demulti$RB <- NULL}
   
   
   report_reference <- character()

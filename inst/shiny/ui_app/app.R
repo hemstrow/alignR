@@ -231,7 +231,7 @@ ui <- navbarPage(
            fluidRow(hidden(uiOutput("aligned_files_report")))))),
   
   #============navbar options========
-  id = "MainTabs"
+  id = "alignR"
   #============end UI================
 )
 
@@ -607,7 +607,7 @@ server <- function(input, output, session) {
       remove_modal_spinner()
       
       x$demultiplexed <- 1
-      updateTabsetPanel(session, "MainTabs", "Alignment")
+      updateTabsetPanel(session, "alignR", "Alignment")
     }
   })
   
@@ -719,7 +719,7 @@ server <- function(input, output, session) {
                  reset("pre_existing_RB") 
                  reset("pre_existing_RA")
                  
-                 updateTabsetPanel(session, "MainTabs", "Alignment")
+                 updateTabsetPanel(session, "alignR", "Alignment")
                })
   
   
@@ -735,7 +735,6 @@ server <- function(input, output, session) {
   # show or hide reporters
   observeEvent(x$demultiplexed, ignoreInit = TRUE, {
     if(x$demultiplexed){
-      
       show("demultiplexed_files_report_RA")
       show("alignment_method")
       
@@ -903,7 +902,7 @@ server <- function(input, output, session) {
     }
     
     remove_modal_spinner()
-    updateTabsetPanel(session, "MainTabs", "Genotyping")
+    updateTabsetPanel(session, "alignR", "Genotyping")
   })
   
   #==========import existing alignments============
@@ -928,7 +927,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$continue_to_genotyping, ignoreInit = TRUE,{
-    updateTabsetPanel(session, "MainTabs", "Genotyping")
+    updateTabsetPanel(session, "alignR", "Genotyping")
   })
   
   #==========report on alignment=========================
