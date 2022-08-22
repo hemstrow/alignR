@@ -5,7 +5,7 @@ library(shinybusy)
 library(alignR)
 source("app_code.R")
 
-root <- c(wd = normalizePath("."), root = "/", home = normalizePath("~"), test = normalizePath("/mnt/c/Users/Will/Documents/GitHub/temp/"))
+root <- c(wd = normalizePath("."), root = "/", home = normalizePath("~"))
 
 # things to add: Show head of .fastq files and barcodes once selected
 
