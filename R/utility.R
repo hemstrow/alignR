@@ -18,6 +18,8 @@
 #'   RA (and RB if paired-end) file paths to subset files.
 equalize_read_counts <- function(RA_fastqs, RB_fastqs = NULL, nreads = "lowest",
                                  outfile_prefix = "subset_"){
+  old.scipen <- options("scipen")
+  options(scipen = 999)
   #==========sanity checks============
   RA_fastqs <- normalizePath(RA_fastqs)
   if(!is.null(RB_fastqs)){
@@ -85,5 +87,83 @@ equalize_read_counts <- function(RA_fastqs, RB_fastqs = NULL, nreads = "lowest",
     return_files$RB <- NULL
   }
   
+  options(scipen = old.scipen$scipen)
   return(return_files)
+}
+
+#' Merge fastq files
+#'
+#' Merges fastq files as a set from each element of a list. Resulting merged
+#' files will be in the directory of the first fastq file of the first set to
+#' merge.
+#'
+#' @param file_list list where each element contains a set of fastq files to
+#'   merge.
+#' @param names character vector, default NULL. A vector of names for each
+#'   merged output file. If not provided, files will be named "merged_x", where
+#'   x is the name of the first file in each set to merge.
+#' @param par numeric, default 1. Number of cores to use for the merges.
+#'
+#' @export
+#' @author William Hemstrom
+#' @return Generates merged fastq files. File paths provided as a character
+#'   vector returned from this function.
+merge_fastqs <- function(file_list, names = NULL, par = 1){
+  #==========sanity checks=============
+  msg <- character()
+  
+  if(!is.null(names)){
+    if(is.character(names)){
+      if(length(names) != length(file_list)){
+        msg <- c(msg, "The number of provided names must equal the number of desired output files.\n")
+      }
+    }
+    else{
+      msg <- c(msg, "The provided names must be a character vector.\n")
+    }
+  }
+  
+  if(any(!tools::file_ext(unlist(file_list)) %in% c("fasta", "fastq", "fa", "fq"))){
+    msg <- c(msg, "Only fastq, fastq, fa, or fq files accepted.\n")
+  }
+  
+  bad.files <- !file.exists(unlist(file_list))
+  if(any(bad.files)){
+    msg <- c(msg, paste0("Some files not located:\n\t", paste0(unlist(file_list)[bad.files], collapse = "\n\t"), "\n"))
+  }
+  
+  if(length(msg) > 0){
+    stop(msg)
+  }
+  #==========sanity checks=============
+  
+  # prep
+  par <- min(par, length(file_list))
+  
+  cl <- parallel::makePSOCKcluster(par)
+  doParallel::registerDoParallel(cl)
+  
+  dir <- normalizePath(dirname(file_list[[1]][1]))
+  
+  # run
+  output <- foreach::foreach(q = 1:length(file_list), .inorder = TRUE, .errorhandling = "pass",
+                             .packages = "alignR"
+  ) %dopar% {
+    
+    if(is.null(names)){
+      outfile <- file.path(dir, paste0("merged_", basename(file_list[[q]][1])))
+    }
+    else{
+      outfile <- file.path(dir, paste0(names[q], ".fastq"))
+    }
+
+    system(paste0("cat ", paste0(file_list[[q]], collapse = " "), " > ", outfile))
+    
+    outfile
+  }
+  
+  # release cores and clean up
+  parallel::stopCluster(cl)
+  
+  return(unlist(output))
 }
