@@ -9,7 +9,7 @@ genotype_bams(
   outfile_prefix = "genotypes",
   minInd = floor(length(bamfiles)/2),
   genotyper = "GATK",
-  SNP_pval = 1e-08,
+  SNP_pval = 0.00000001,
   doGeno = "NN",
   postCutoff = 0.95,
   minQ = 20,
