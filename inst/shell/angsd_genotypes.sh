@@ -11,6 +11,7 @@ doVcf=${10}
 doRf=${11}
 rf=${12}
 par=${13}
+minMaf=${14}
 
 if [[ $doRf -eq 1 ]]
 then
@@ -26,6 +27,7 @@ then
   -minQ $minQ \
   -minMapQ $minMapQ \
   -minInd $minInd \
+  -minMaf $minMaf \
   -doBcf $doVcf \
   -rf $rf \
   -nThreads $par
@@ -42,6 +44,7 @@ else
   -minQ $minQ \
   -minMapQ $minMapQ \
   -minInd $minInd \
+  -minMaf $minMaf \
   -doBcf $doVcf \
   -nThreads $par
 fi

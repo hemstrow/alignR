@@ -14,6 +14,7 @@ genotype_bams(
   postCutoff = 0.95,
   minQ = 20,
   minMapQ = 20,
+  minMaf = 0,
   unzip = FALSE,
   doVcf = FALSE,
   filter_paralogs = FALSE,
@@ -67,6 +68,9 @@ during genotyping. The default, 20, corresponds to 99\% accuracy.}
 \item{minMapQ}{numeric, default 20. The minimum Phred \emph{mapping} quality
 score needed for a given sequenced base on a single read to be considered
 during genotyping. The default, 20, corresponds to 99\% accuracy.}
+
+\item{minMaf}{numeric, default 0. The minimum Minor Allele Frequency (MAF)
+needed to keep a locus.}
 
 \item{unzip}{logical, default FALSE. If TRUE, resulting genotype file will be
 unzipped.}

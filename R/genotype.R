@@ -37,6 +37,8 @@
 #' @param minMapQ numeric, default 20. The minimum Phred \emph{mapping} quality
 #'   score needed for a given sequenced base on a single read to be considered
 #'   during genotyping. The default, 20, corresponds to 99\% accuracy.
+#' @param minMaf numeric, default 0. The minimum Minor Allele Frequency (MAF)
+#'   needed to keep a locus.
 #' @param unzip logical, default FALSE. If TRUE, resulting genotype file will be
 #'   unzipped.
 #' @param doVcf logical, default FALSE. If TRUE, create a vcf file. Not
@@ -93,6 +95,7 @@ genotype_bams <- function(bamfiles,
                           postCutoff = 0.95,
                           minQ = 20,
                           minMapQ = 20,
+                          minMaf = 0,
                           unzip = FALSE,
                           doVcf = FALSE,
                           filter_paralogs = FALSE,
@@ -289,7 +292,8 @@ genotype_bams <- function(bamfiles,
                   ifelse(angsd_doVcf, 1, 0),
                   ifelse(!isFALSE(rf), 1, 0),
                   ifelse(!isFALSE(rf), rf, "NA"),
-                  par), collapse = " ")
+                  par,
+                  minMaf), collapse = " ")
                 )
 
   system(cmd)
