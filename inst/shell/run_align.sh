@@ -38,10 +38,12 @@ samtools index ${c1}.sort.flt.bam
 
 # clean
 if [[ $rmdup -eq 1 ]]
+then
   rm ${c1}.markdup.bam
 fi
 
 if [[ $improperpair -eq 1 ]]
+then
   ${c1}.flt.bam
 fi
 
