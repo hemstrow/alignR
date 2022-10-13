@@ -105,8 +105,8 @@
   # try stacks
   stacks_check <- suppressWarnings(system("stacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
   stacks_check2 <- suppressWarnings(system("cstacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
-  if(any(c(stacks_check, stacks_check2) == 0)){
-    Sys.setenv(stacks_install = ifelse(stacks_check == 0, "general", "specific"))
+  if(any(c(stacks_check, stacks_check2) %in% c(0, 1))){ # because an error code of 1 is actually OK too. 127 means couldn't find, a no-go
+    Sys.setenv(stacks_install = ifelse(stacks_check %in% c(0, 1), "general", "specific"))
     packageStartupMessage("STACKS is good-to-go!\n")
   }
   else{
