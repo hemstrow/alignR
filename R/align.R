@@ -474,7 +474,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
   all_files <- file.path(filepaths[1], c(map$RA, map$RB))
   
   if(any(fileext != "gz")){
-    if(interactive()){
+    if(interactive() & ask_confirmation){
       cat("stacks expects that each file is zipped (.gz).\n")
       resp <- ""
       while(!resp %in% c("y", "n")){
@@ -486,11 +486,16 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
         else{
           resp <- "y"
         }
-        
       }
-      if(resp == "n"){
-        stop("stacks expects that each file is zipped (.gz).\n")
-      }
+    }
+    else if(!interactive() & ask_confirmation){
+      resp <- "n"
+    }
+    else{
+      resp <- "y"
+    }
+    
+    if(resp == "y"){
       
       cat("gzipping", sum(fileext != "gz"), "files... ")
       
