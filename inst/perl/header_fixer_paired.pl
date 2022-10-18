@@ -13,7 +13,10 @@ open(FILE2, "<$file2") or die;
 open(OUTFILE, '>', $output) or die $!;
 open(OUTFILE2, '>', $output2) or die $!;
 
+# $i=1;
+
 while (<FILE>) {
+  # print("=================================================================\nread: $i\n\n");
   
   $header = $_;
   $line2 = <FILE>;
@@ -44,6 +47,7 @@ while (<FILE>) {
   }
   
   if($need_to_edit_headers){
+    # print("Checking headers:\n");
     # figure out matching header portion
     $prog = 0;
     foreach $h1p (@sheader1){
@@ -59,13 +63,17 @@ while (<FILE>) {
     }
 
     $equi = join("", @equi_array);
+    # print("\n\t equi: $equi\n");
     
     @sheader = split(/ /, $header);
     $tail = $sheader[$#sheader];
     
+    # print("\n\t tail: $tail\n");
+    
     # replace the common ending pattern 1:N:0:1 with /1 or /2
-    if($tail =~ m/(\d):N:\d:\d\n/){
+    if($tail =~ m/(\d):N:\d+:\d+\n/){
       $R = $1;
+      # print("\t\tkey:$R\n");
       if($R eq 3){
         $header = $equi . "/" . 2 ."\n";
         $headerR2 = $equi . "/" . 1 ."\n";
@@ -75,8 +83,10 @@ while (<FILE>) {
         $headerR2 = $equi . "/" . 2 ."\n";
       }
     }
+    # print("New R1 header: $header\nNew R2 header: $headerR2;")
   }
   
+  $i++;
   print OUTFILE $header . $line2 . $line3 . $line4;
   print OUTFILE2 $headerR2 . $line2R2 . $line3R2 . $line4R2;
   

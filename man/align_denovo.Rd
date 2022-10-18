@@ -35,11 +35,13 @@ STACKS documentation).}
 
 \item{par}{numeric, default 1. Number of cores to use for the alignments.}
 
-\item{check_headers}{logical, default TRUE. If TRUE, will check that fastq
+\item{check_headers}{logical, default FALSE. If TRUE, will check that fastq
 headers are reasonable (end in /1 and /2 and otherwise match between paired
 ends) before running STACKS if doing denovo assembly with paired-end reads.
-Somewhat computationally and I/O intensive, so disable if confident that
-headers are OK.}
+Somewhat computationally and I/O intensive, so disable if you are confident
+that your headers are OK. Headers produced by \code{link{demultiplex}} do
+not need checked unless it's \code{stacks_header} argument was set to
+FALSE when run.}
 
 \item{stacks_cleanup}{logical, default TRUE. If TRUE, files other than .bam
 files created by stacks will be removed.}
@@ -97,6 +99,12 @@ Single-end reads are not filtered following alignment, although filtering can
 (and usually should) be done while calling genotypes or doing other
 down-stream analyses. The full alignment script can be accessed using
 \code{system.file("shell", "run_align_single.sh", "alignR")}.
+
+Selecting the corretc M and n values for STACKS can be quite tricky.
+For advice on this, try checking out
+[this paper by Paris et al 2017](https://doi.org/10.1111/2041-210X.12775),
+which provides an excellent summary. Make sure to cite this paper if you
+use it!
 }
 \author{
 William Hemstrom
