@@ -71,10 +71,10 @@ while (<FILE>) {
     # print("\n\t tail: $tail\n");
     
     # replace the common ending pattern 1:N:0:1 with /1 or /2
-    if($tail =~ m/(\d):N:\d+:\d+\n/){
+    if($tail =~ m/(\d):N:\d+:[\dA-Z]+\n/){
       $R = $1;
       # print("\t\tkey:$R\n");
-      if($R eq 3){
+      if($R eq 3 | $R eq 2){
         $header = $equi . "/" . 2 ."\n";
         $headerR2 = $equi . "/" . 1 ."\n";
       }
