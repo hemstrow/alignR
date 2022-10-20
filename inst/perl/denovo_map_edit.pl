@@ -33,7 +33,7 @@ use constant true  => 1;
 use constant false => 0;
 
 my $dry_run      = false;
-my $exe_path     = "stacks";
+my $exe_path     = "";
 my $out_path     = "";
 my $popmap_path  = "";
 my $sample_path  = "";

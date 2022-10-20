@@ -533,7 +533,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                 " -n ", n, 
                 " -o ", filepaths[1], 
                 " --popmap alignR_popmap",
-                " -e ", ifelse(stacks.ver == "general", "stacks", ""))
+                ifelse(stacks.ver == "general", " -e stacks", ""))
   cmd <- ifelse(is_single, cmd, paste0(cmd, " --paired"))
   
   system(cmd)
