@@ -370,6 +370,8 @@
 # saves .rf files batched into chunk_size bp lengths for genotyping
 # returns a vector of the rf file names
 .batch_genotyping <- function(chr_info, chunk_size){
+  old_scipen <- options("scipen")
+  options(scipen = 999)
   chr_info <- read.table(chr_info, sep = "\t")
   chr_info$cumsum <- cumsum(as.numeric(chr_info$V2))
   chr_info$css <- c(0, chr_info$cumsum[-nrow(chr_info)]) + 1
@@ -403,5 +405,6 @@
     writeLines(rfs[[i]]$cmd, paste0("region", i, ".rf"), sep = "\n")
   }
   
+  options(scipen = old_scipen$scipen)
   return(paste0("region", 1:length(starts), ".rf"))
 }
