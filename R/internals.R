@@ -364,3 +364,44 @@
     system(cmd)
   }
 }
+
+
+# takes a two tab file with chromsome names and lengths and a chunck size
+# saves .rf files batched into chunk_size bp lengths for genotyping
+# returns a vector of the rf file names
+.batch_genotyping <- function(chr_info, chunk_size){
+  chr_info <- read.table(chr_info, sep = "\t")
+  chr_info$cumsum <- cumsum(as.numeric(chr_info$V2))
+  chr_info$css <- c(0, chr_info$cumsum[-nrow(chr_info)]) + 1
+  
+  starts <- seq(1, chr_info$cumsum[nrow(chr_info)], by = chunk_size)
+  ends <- c(starts[-1] - 1, chr_info$cumsum[nrow(chr_info)])
+  
+  rfs <- vector("list", length(starts))
+  
+  for(i in 1:length(starts)){
+    tchrs <- chr_info[chr_info$cumsum >= starts[i] & chr_info$css <= ends[i],]
+    start_chr_start <- starts[i] - tchrs$css[1] + 1
+    end_chr_end <- ends[i] - tchrs$css[nrow(tchrs)] + 1
+    if(nrow(tchrs) == 1){
+      rfs[[i]] <- data.frame(chr = tchrs$V1, start = start_chr_start, end = end_chr_end)
+    }
+    else if(nrow(tchrs) == 2){
+      rfs[[i]] <- data.frame(chr = tchrs$V1,
+                             start = c(start_chr_start, 1),
+                             end =  c(tchrs$V2[-nrow(tchrs)], end_chr_end))
+    }
+    else{
+      
+      rfs[[i]] <- data.frame(chr = tchrs$V1,
+                             start = c(start_chr_start, rep(1, nrow(tchrs) - 1)),
+                             end = c(tchrs$V2[-nrow(tchrs)], end_chr_end))
+    }
+    
+    rfs[[i]]$cmd <- paste0(rfs[[i]]$chr, ":", rfs[[i]]$start, "-", rfs[[i]]$end)
+    
+    writeLines(rfs[[i]]$cmd, paste0("region", i, ".rf"), sep = "\n")
+  }
+  
+  return(paste0("region", 1:length(starts), ".rf"))
+}
