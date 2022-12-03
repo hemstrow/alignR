@@ -53,7 +53,7 @@ while(<FILE1>){
   $line2RA = <FILE1>;
   $line3RA = <FILE1>;
   $line4RA = <FILE1>;
-  print("========================= \n $line2RA \n");
+  # print("========================= \n $line2RA \n");
   
   if($paired = 1){
     $header1RB = <FILE2>;
@@ -69,14 +69,14 @@ while(<FILE1>){
   @seqRA = split(//, $line2RA);
   $loop_len_RA = ($#seqRA) - ($k - 1);
   
-  print("Entering RA loop \n");
+  # print("Entering RA loop \n");
   $reject = check_fastq($loop_len_RA, @seqRA);
   
   if($reject == 1){
-    print("read rejected \n");
+    # print("read rejected \n");
     next;
   }
-  else{print("RA accepted, moving to RB \n");}
+  #else{print("RA accepted, moving to RB \n");}
   
   if($paired = 1){
     #check RB
@@ -88,13 +88,13 @@ while(<FILE1>){
     $reject = check_fastq($loop_len_RB, @seqRB);
     
     if($reject == 1){
-      print("read rejected \n");
+      # print("read rejected \n");
       next;
     }
-    else{print("RB accepted \n");}
+    # else{print("RB accepted \n");}
   }
   
-  print("printing reads to outfile \n");
+  # print("printing reads to outfile \n");
   
   #if passes all filters in both RA and RB, write RA and RB reads to RA and RB output files
   print(OUTFILE1 $header1RA . $line2RA . "\n" .  $line3RA . $line4RA);
@@ -142,14 +142,14 @@ sub check_fastq{
     if($rare_in_a_row >= $rare_count){
       $i = $loop_len + 1;
       $reject = 1;
-      print("read rejected. rare filter \n");
+      # print("read rejected. rare filter \n");
       next;
     }
     
     if($abundant_ >= $abundant_count){
       $i = $loop_len + 1;
       $reject = 1;
-      print("read rejected. abundant filter \n");
+      # print("read rejected. abundant filter \n");
       next;
     }
     
