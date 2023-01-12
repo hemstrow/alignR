@@ -267,7 +267,15 @@ brew install bcftools
 ```
 
 ## ngsParalog
-alignR only needs ngsParalog if you are planning to do paralog filtering during genotype calling with `genotype_bams()`. Current versions of `ngsParalog` unfortunately are failing to compile on most systems (hopefully this will be fixed soon!). For now, a compiled version can be downloaded from X. After downloading, move the file to somewhere on your system `$PATH`:
+alignR only needs ngsParalog if you are planning to do paralog filtering during genotype calling with `genotype_bams()`. You can install the program from github:
+
+```{bash}
+git clone https://github.com/tplinderoth/ngsParalog
+cd ngsParalog
+make
+```
+
+After downloading, move the file to somewhere on your system `$PATH`:
 
 On Linux:
 ```{bash}
@@ -279,7 +287,7 @@ On Mac:
 mv ngsParalog /usr/local/bin
 ```
 
-
+The ngsParalog directory you downloaded can then be removed safely.
 ## Wrap-up
 
 This should be everything you need to run alignR. To verify that all dependencies are correctly installed, reload alignR:
