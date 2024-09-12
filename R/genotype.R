@@ -76,17 +76,17 @@
 #'   the entire chr1 if it is 10000 bp long).
 #' @param par numeric, default 1. Number of cores to allow ANGSD to use for
 #'   genotyping.
-#'   
+#'
 #' @return Generates genotype files in the requested format named
 #'   outfile_prefix.geno(.gz) in the directory of the first bamfile. The file
 #'   will be zipped (.gz) if \code{unzip} is not TRUE. In R, returns file path
 #'   to genotype output.
-#'   
+#'
 #' @author William Hemstrom
 #' @author Michael Miller
 #'
 #' @export
-genotype_bams <- function(bamfiles,
+genotype_bams_ANGSD <- function(bamfiles,
                           outfile_prefix = "genotypes",
                           minInd = floor(length(bamfiles)/2),
                           genotyper = "GATK",
@@ -119,42 +119,42 @@ genotype_bams <- function(bamfiles,
   }
 
   if(filter_paralogs){
-    
+
     if(length(filter_paralogs_populations) != length(bamfiles)){
       msg <- c(msg, "The length of 'filter_paralogs_populations' must be equal to that of the 'bamfiles'.\n")
     }
     pops <- unique(filter_paralogs_populations)
-    
+
     if(!.check_system_install("ngsParalog")){
       msg <- c(msg, "No ngsParalog install located on system path.\n")
     }
     if(!.check_system_install("samtools")){
       msg <- c(msg, "No SAMtools install located on system path.\n")
     }
-    
+
     if(!file.exists(filter_paralogs_reference)){
       msg <- c(msg, paste0("File not found: ", filter_paralogs_reference, "\n"))
     }
     else{
       check <- .check_is_genome(filter_paralogs_reference)
       if(is.character(check)){msg <- c(msg, check)}
-      
+
     }
   }
-  
+
   if(!isFALSE(rf)){
     rf <- normalizePath(rf)
     if(!file.exists(rf)){
       msg <- c(msg, paste0("Cannot locate file: ", rf, "\n"))
     }
   }
-  
+
   bamfiles <- normalizePath(bamfiles)
   bad_bams <- which(!file.exists(bamfiles))
   if(length(bad_bams) != 0){
     msg <- c(msg, paste0("Cannot locate bamfiles: ", paste0(bad_bams, collapse = ", "), "\n"))
   }
-  
+
   if(length(msg) > 0){
     stop(msg)
   }
@@ -222,7 +222,7 @@ genotype_bams <- function(bamfiles,
       if(!.check_system_install("perl")){
         msg <- c(msg, "No perl install located on system path. This is needed if a .vcf file is to be generated from a numeric or NN output.\n")
       }
-      
+
       doGeno <- doGeno + 1
     }
   }
@@ -230,44 +230,44 @@ genotype_bams <- function(bamfiles,
     angsd_doVcf <- FALSE
     local_doVcf <- FALSE
   }
-  
+
   dir <- dirname(bamfiles[1])
   outfile <- file.path(dir, outfile_prefix)
-  
+
   if(unzip){
     output_filename <- paste0(outfile, ".geno")
     if(file.exists(output_filename)){
       msg <- c(msg, paste0("File: ", output_filename, "already exists. Genotyping not run.\n"))
     }
   }
-  
-  
-  
+
+
+
   if(length(msg) > 0){
     stop(msg)
   }
-  
-  
-  
 
-  
+
+
+
+
 
   #==============prepare to run=================
   old.scipen <- options("scipen")
   options(scipen = 999)
   script <- .fetch_a_script("angsd_genotypes.sh", "shell")
-  
+
   # filter paralogs if requested
   if(filter_paralogs){
-    rf <- .filter_paralogs(bamfiles = bamfiles, 
+    rf <- .filter_paralogs(bamfiles = bamfiles,
                            populations = filter_paralogs_populations,
                            outfile = "selected_clean_regions.txt",
-                           buffer = filter_paralogs_buffer, 
+                           buffer = filter_paralogs_buffer,
                            alpha = filter_paralogs_alpha,
-                           reference = filter_paralogs_reference, 
-                           genotyper = genotyper, 
-                           SNP_pval = SNP_pval, 
-                           minQ = minQ, 
+                           reference = filter_paralogs_reference,
+                           genotyper = genotyper,
+                           SNP_pval = SNP_pval,
+                           minQ = minQ,
                            minMapQ = minMapQ,
                            cleanup = TRUE,
                            rf = rf,
@@ -297,21 +297,21 @@ genotype_bams <- function(bamfiles,
                 )
 
   system(cmd)
-  
+
   # if returning a vcf, convert and do so
   if(angsd_doVcf){
     system(paste0("bcftools convert -O v -o ", outfile, ".vcf ", outfile, ".bcf"))
     output_filename <- paste0(outfile, ".vcf")
     return(output_filename)
   }
-  
+
   output_filename <- paste0(outfile, ".geno.gz")
 
   if(unzip){
     system(paste0("gunzip ", outfile, ".geno.gz"))
     output_filename <- paste0(outfile, ".geno")
   }
-  
+
   if(local_doVcf){ # only TRUE if unzip is TRUE due to sanity checks, so don't need to worry about a zipped input.
     vcf_script <- .fetch_a_script("ConvertGenosToVCF.pl", "perl")
     tf <- tempfile()
@@ -324,8 +324,10 @@ genotype_bams <- function(bamfiles,
     file.remove(tf)
     return(paste0(outfile, ".vcf"))
   }
-  
+
   options(scipen = old.scipen)
-  
+
   return(output_filename)
 }
+
+

@@ -1,3 +1,5 @@
+set -e
+
 list=${1}
 minInd=$2
 genotyper=$3

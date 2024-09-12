@@ -16,7 +16,7 @@
   perl_check <- suppressWarnings(system("perl -v", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(perl_check == 127){
     Sys.setenv(perl_install = FALSE)
-    warning(paste0("No perl installation detected! Some functions will fail:\n\t", 
+    warning(paste0("No perl installation detected! Some functions will fail:\n\t",
                    paste0(unlist(.dependency_function_match("perl")), collapse = "\n\t"),
                    "\n"))
   }
@@ -40,7 +40,7 @@
   samtools_check <- suppressWarnings(system("samtools", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(samtools_check == 127){
     Sys.setenv(samtools_install = FALSE)
-    packageStartupMessage(paste0("No SAMtools installation detected! Some functions will fail:\n\t", 
+    packageStartupMessage(paste0("No SAMtools installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("samtools")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -48,12 +48,12 @@
     packageStartupMessage("SAMtools is good-to-go!\n")
     Sys.setenv(samtools_install = TRUE)
   }
-  
+
   # try bcftools
   bcftools_check <- suppressWarnings(system("bcftools", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(bcftools_check == 127){
     Sys.setenv(bcftools_install = FALSE)
-    packageStartupMessage(paste0("No bcftools installation detected! Some functions will fail:\n\t", 
+    packageStartupMessage(paste0("No bcftools installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("bcftools")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -62,11 +62,25 @@
     Sys.setenv(bcftools_install = TRUE)
   }
 
+
+  # try vcftools
+  vcftools_check <- suppressWarnings(system("vcftools", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(vcftools_check == 127){
+    Sys.setenv(vcftools_install = FALSE)
+    packageStartupMessage(paste0("No vcftools installation detected! Some functions will fail:\n\t",
+                                 paste0(unlist(.dependency_function_match("vcftools")), collapse = "\n\t"),
+                                 "\n"))
+  }
+  else{
+    packageStartupMessage("vcftools is good-to-go!\n")
+    Sys.setenv(vcftools_install = TRUE)
+  }
+
   # try angsd
   angsd_check <- suppressWarnings(system("angsd", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(angsd_check == 127){
     Sys.setenv(angsd_install = FALSE)
-    packageStartupMessage(paste0("No angsd installation detected! Some functions will fail:\n\t", 
+    packageStartupMessage(paste0("No angsd installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("angsd")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -80,7 +94,7 @@
   bwa_check <- suppressWarnings(system("bwa", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(bwa_check == 127){
     Sys.setenv(bwa_install = FALSE)
-    packageStartupMessage(paste0("No bwa installation detected! Some functions will fail:\n\t", 
+    packageStartupMessage(paste0("No bwa installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("bwa")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -88,12 +102,12 @@
     packageStartupMessage("bwa is good-to-go!\n")
     Sys.setenv(bwa_install = TRUE)
   }
-  
+
   # try ngsParalog
   ngsParalog_check <- suppressWarnings(system("ngsParalog", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(ngsParalog_check == 127){
     Sys.setenv(ngsParalog_install = FALSE)
-    packageStartupMessage(paste0("No ngsParalog installation detected! Some functions will fail:\n\t", 
+    packageStartupMessage(paste0("No ngsParalog installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("ngsParalog")), collapse = "\n\t"),
                                  "\n"))
   }
@@ -101,7 +115,7 @@
     packageStartupMessage("ngsParalog is good-to-go!\n")
     Sys.setenv(ngsParalog_install = TRUE)
   }
-  
+
   # try stacks
   stacks_check <- suppressWarnings(system("stacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
   stacks_check2 <- suppressWarnings(system("cstacks", ignore.stdout = TRUE, ignore.stderr = TRUE))
@@ -111,8 +125,21 @@
   }
   else{
     Sys.setenv(stacks_install = FALSE)
-    packageStartupMessage(paste0("No STACKS installation detected! Some functions will fail:\n\t", 
+    packageStartupMessage(paste0("No STACKS installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("stacks")), collapse = "\n\t"),
                                  "\n"))
+  }
+
+  # try gatk
+  gatk_check <- suppressWarnings(system("gatk", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(ngsParalog_check == 127){
+    Sys.setenv(gatk_install = FALSE)
+    packageStartupMessage(paste0("No gatk installation detected! Some functions will fail:\n\t",
+                                 paste0(unlist(.dependency_function_match("gatk")), collapse = "\n\t"),
+                                 "\n"))
+  }
+  else{
+    packageStartupMessage("gatk is good-to-go!\n")
+    Sys.setenv(gatk_install = TRUE)
   }
 }

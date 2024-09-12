@@ -1,3 +1,5 @@
+set -e
+
 bamlist=$1
 ref=$2
 genotyper=$3
