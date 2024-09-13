@@ -7,13 +7,15 @@ tmp_dir=$4
 javapath=$5
 gatkpath=$6
 
+bn=$(basename "$bedfile" .bed)
+dir=$(dirname "$bedfile")
+
 # run the genotyping
-echo "genotype start at: `date`"
 $javapath -jar -Xmx${mem}g -Xms${mem}g $gatkpath GenotypeGVCFs \
   -R $ref \
   -L $bedfile \
-  -V gendb://${bedfile}_db \
-  -O raw_${bedfile}.vcf \
+  -V gendb://${dir}/${bn}_db \
+  -O ${dir}/${bn}_raw.vcf \
   --tmp-dir $tmp_dir \
   --new-qual \
   --max-alternate-alleles 2 \

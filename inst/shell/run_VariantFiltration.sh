@@ -13,9 +13,12 @@ mem=${10}
 javapath=${11}
 gatkpath=${12}
 
+bn=$(basename "$vcf" .vcf)
+dir=$(dirname "$vcf")
+
 $javapath -jar -Xmx${mem}g -Xms${mem}g $gatkpath VariantFiltration \
        -R $ref \
-       -V ${vcf}.vcf \
+       -V $vcf \
        --filter-name "QDf" \
        --filter-expression "QD < $QD" \
        --filter-name "FSf" \
@@ -28,16 +31,16 @@ $javapath -jar -Xmx${mem}g -Xms${mem}g $gatkpath VariantFiltration \
        --filter-expression "MQRankSum < $MQRS" \
        --filter-name "RPRSf" \
        --filter-expression "ReadPosRankSum < $RPRS" \
-       -O hard_filt_${vcf}.vcf
+       -O ${dir}/${bn}_hard_filt.vcf
 
-bcftools view --types snps -m 2 -M 2 hard_filt_${vcf}.vcf > hard_filt_temp_${vcf}.vcf
+bcftools view --types snps -m 2 -M 2 ${dir}/${bn}_hard_filt.vcf > ${dir}/${bn}_hard_filt_temp.vcf
 
-vcftools --vcf hard_filt_temp_${vcf}.vcf \
+vcftools --vcf ${dir}/${bn}_hard_filt_temp.vcf \
         --remove-filtered-all \
         --remove-indels \
         --minGQ $GQ \
         --recode \
         --recode-INFO-all \
-        --out hard_filt_pass_${vcf}
+        --out ${bn}_hard_filt_pass
 
-rm hard_filt_temp_${vcf}.vcf
+rm ${dir}/${bn}_hard_filt_temp.vcf
