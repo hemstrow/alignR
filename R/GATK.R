@@ -56,7 +56,6 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
   chunks <- split(bamfiles, it_par)
 
   # run
-  browser()
   output <- foreach::foreach(q = 1:par, .inorder = FALSE, .errorhandling = "pass",
                              .packages = "alignR"
   ) %dopar% {
@@ -66,7 +65,7 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
 
       ttempdir <- file.path(temp_dir, paste0("HC_q", q, "_i", i))
       dir.create(ttempdir)
-      cmd <- paste0("bash run_HaplotypeCaller.sh ",
+      cmd <- paste0("bash ", script, " ",
                     chunks[[q]][i], " ",
                     reference, " ",
                     ttempdir, " ",
@@ -97,6 +96,7 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
 
   # check validity
   valid <- data.table::rbindlist(output)
+  valid[,2] <- as.logical(valid[,2])
 
   if(any(!valid[,2])){
     warning(paste0("Some HaplotypeCaller runs produced invalid vcf outputs. This can occur for a few reasons, but too small memory limits are a common cause. Invalid outputs:",
@@ -109,10 +109,10 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
   # save a hapmap
   sample_map <- data.frame(samp = basename(tools::file_path_sans_ext(bamfiles)), file = normalizePath(paste0(bamfiles, ".hapcalls.gvcf.gz")))
   data.table::fwrite(sample_map, paste0(bamfiles[1], "_hapmap.txt"), sep = "\t", col.names = F, row.names = F)
-  cat("hapmap saved to: ", paste0(bamfiles[1], "_hapmap.txt"))
+  cat("hapmap saved to: ", paste0(bamfiles[1], "_hapmap.txt"), "\n")
 
   # return info
-  return(sample_map)
+  return(paste0(bamfiles[1], "_hapmap.txt"))
 }
 
 #' @describeIn genotype_bams_GATK Add read groups to bam files with
@@ -171,6 +171,10 @@ add_RGS <- function(bamfiles, fastqs, par = 1, platform = "ILLUMINA", java_path 
   chunks <- split(bamfiles, it_par)
   chunks_f <- split(fastqs, it_par)
 
+  # register parallel architecture
+  cl <- parallel::makePSOCKcluster(par)
+  doParallel::registerDoParallel(cl)
+
   # run
   output <- foreach::foreach(q = 1:par, .inorder = FALSE, .errorhandling = "pass",
                              .packages = "alignR"
@@ -190,6 +194,8 @@ add_RGS <- function(bamfiles, fastqs, par = 1, platform = "ILLUMINA", java_path 
 
   # release cores and clean up
   parallel::stopCluster(cl)
+
+  return(paste0(tools::file_path_sans_ext(bamfiles), ".RG.bam"))
 }
 
 #' Make .bed files for chromosomes or genomic chunks.
@@ -237,7 +243,7 @@ make_region_beds <- function(reference, min_chr_size = 0, chunk_size = "chr", ou
   dl <- unlist(purrr::map(dl, 2))
 
 
-  bed <- data.frame(gsub(" .+", "", d), 0, as.numeric(dl))
+  bed <- data.frame(gsub(" .+", "", gsub("\t.+", "", d)), 0, as.numeric(dl))
 
   if(any(bed[,3] < min_chr_size)){
     bed <- bed[-which(bed[,3] < min_chr_size),]
@@ -490,7 +496,9 @@ run_VariantFiltration <- function(vcfs, reference, mem,
 
 #' @describeIn genotype_bams_GATK Prepare a reference genome for genotyping with
 #'   \code{picard} and other indexers.
-prep_genome_GATK <- function(reference, java_path = "java", picard_path = "picard.jar"){
+prep_genome_GATK <- function(reference,
+                             java_path = "java",
+                             picard_path = "picard.jar"){
 
   #======sanity checks=======
   msg <- character()
@@ -532,10 +540,9 @@ prep_genome_GATK <- function(reference, java_path = "java", picard_path = "picar
   }
 
   # index -- picard
-  if(!file.exists(paste0(tools::file_path_sans_ext(reference), ".dict"))){
+  if(!file.exists(paste0(tools::file_path_sans_ext(reference, compression = TRUE), ".dict"))){
     cmd <- paste0(java_path, " -jar ", picard_path,
-                  " CreateSequenceDictionary R= ", reference,
-                  " O= ", paste0(tools::file_path_sans_ext(reference), ".dict"))
+                  " CreateSequenceDictionary R= ", reference)
     system(cmd)
   }
 
@@ -556,7 +563,7 @@ prep_genome_GATK <- function(reference, java_path = "java", picard_path = "picar
 #' @param outfile Character,
 #'   default \code{paste0(tools::file_path_sans_ext(vcfs[1], "_concat.vcf"))}.
 #'   Name for final, concatenated "vcf" file.
-concat_vcfs <- function(vcfs, outfile = paste0(tools::file_path_sans_ext(vcfs[1], "_concat.vcf"))){
+concat_vcfs <- function(vcfs, outfile = paste0(tools::file_path_sans_ext(vcfs[1]), "_concat.vcf")){
   #===sanity checks======
   if(!.check_system_install("bcftools")){
     stop("No bcftools install located on system path.\n")
@@ -566,7 +573,7 @@ concat_vcfs <- function(vcfs, outfile = paste0(tools::file_path_sans_ext(vcfs[1]
 
   vcfs <- normalizePath(vcfs)
   bad_vcfs <- which(!file.exists(vcfs))
-  if(length(bad_bams) != 0){
+  if(length(bad_vcfs) != 0){
     msg <- c(msg, paste0("Cannot locate vcfs: ", paste0(bad_vcfs, collapse = ", "), "\n"))
   }
 
@@ -764,7 +771,7 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
                         java_path = java_path, picard_path = picard_path)
   }
 
-  bedfiles <- make_region_beds(reference, min_chr_size = min_chr_size, chunk_size, outdir = "./bedfiles")
+  bedfiles <- make_region_beds(reference, min_chr_size = min_chr_size, chunk_size, outdir = "./")
 
   #=========run pipeline=====
   hapmap <- run_HaplotypeCaller(bamfiles, reference,
@@ -791,7 +798,7 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
                                 java_path = java_path, gatk4_path = gatk4_path)
 
   # concat if requested
-  if(concatenate_final_vcfs){
+  if(concatenate_final_vcfs & length(vcfs) > 1){
     vcfs <- concat_vcfs(vcfs)
   }
 

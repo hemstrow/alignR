@@ -7,3 +7,4 @@
 ^\.covrignore$
 ^codecov\.yml$
 ^LICENSE
+^data-raw$

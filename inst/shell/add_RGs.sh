@@ -11,13 +11,16 @@ platform=$6
 fastq_head="$(head -n 1 $fastq)"
 IFS=':' read -ra rinf <<< "$fastq_head"
 
+bn=$(basename "$bamfile" .bam)
+dir=$(dirname "$bamfile")
+
 $javapath -jar $picardpath AddOrReplaceReadGroups \
-        I=${bamfile}.bam \
-        O=${bamfile}.RG.bam \
+        I=$bamfile \
+        O=${dir}/${bn}.RG.bam \
         RGLB=Lib-${basename} \
         RGPL=${platform} \
         RGPU=${platform}_${basename} \
         RGSM=${basename} \
         VALIDATION_STRINGENCY=LENIENT
 
-samtools index ${bamfile}.RG.bam
+samtools index ${dir}/${bn}.RG.bam

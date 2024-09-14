@@ -41,6 +41,6 @@ vcftools --vcf ${dir}/${bn}_hard_filt_temp.vcf \
         --minGQ $GQ \
         --recode \
         --recode-INFO-all \
-        --out ${bn}_hard_filt_pass
+        --out ${dir}/${bn}_hard_filt_pass
 
 rm ${dir}/${bn}_hard_filt_temp.vcf

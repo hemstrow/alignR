@@ -13,7 +13,8 @@
 
 .check_is_genome <- function(reference){
   if(!tools::file_ext(reference) %in% c("fa", "fna", "fasta")){
-    return(paste0("File ", reference, "not .fa, .fna, or .fasta. Is this a genome?\n"))
+    if(!tools::file_ext(tools::file_path_sans_ext(reference)) %in% c("fa", "fna", "fasta"))
+    return(paste0("File ", reference, " not .fa, .fna, or .fasta. Is this a genome?\n"))
   }
   else{
     return(TRUE)
