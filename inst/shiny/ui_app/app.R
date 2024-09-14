@@ -766,9 +766,11 @@ server <- function(input, output, session) {
     toggle("demultiplexing")
     toggle("pre_existing_RA")
 
+    temp_dir <- tempdir()
+
     R1_files <- list.files(system.file("exdata", package = "alignR"), full.names = TRUE)
-    file.copy(R1_files, ".")
-    R1_files <- basename(R1_files)
+    file.copy(R1_files, temp_dir)
+    R1_files <- file.path(temp_dir, basename(R1_files))
     x$files$demultiplexed_files$RB <- R1_files[grep("_R2\\.fastq$", R1_files)]
     x$files$demultiplexed_files$RA <- R1_files[grep("_R1\\.fastq$", R1_files)]
     x$files$reference_genome <- R1_files[grep("\\.fna\\.gz", R1_files)]
@@ -1129,6 +1131,15 @@ server <- function(input, output, session) {
     x$files$picard_path <- .parse_shinyFiles_path(root, input$picard_path)
   })
 
+  observeEvent(input$genotyper_panel,{
+    if(input$genotyper_panel %in% c("ANGSD", "GATK")){
+      show("run_genotyping")
+    }
+    else{
+      hide("run_genotyping")
+    }
+  })
+
 
   #===============run genotyping==================
   # make the run_genotyping button here for validation
@@ -1269,20 +1280,19 @@ server <- function(input, output, session) {
       x$genotyped <- 1
     }
     else if(input$genotyper_panel == "GATK"){
-      browser()
       x$files$genotypes <- genotype_bams_GATK(x$files$alignments,
                                               fastqs = x$files$demultiplexed_files$RA,
                                               reference = x$files$reference_genome,
                                               par = input$par,
                                               min_chr_size = input$min_chunk_size,
                                               chunk_size = ifelse(input$chunk_size == 0, "chr", input$chunk_size),
-                                              QD = input$QD,
-                                              FS = input$FS,
-                                              SOR = input$SOR,
-                                              MQ = input$MQ,
-                                              MQRankSum = input$MQRankSum,
-                                              ReadPosRankSum = input$ReadPosRankSum,
-                                              min_genotype_quality = input$min_genotype_quality,
+                                              QD = as.numeric(input$QD), # wrapped in as numeric to coerce integers, which don't pass correctly into the shell script
+                                              FS = as.numeric(input$FS),
+                                              SOR = as.numeric(input$SOR),
+                                              MQ = as.numeric(input$MQ),
+                                              MQRankSum = as.numeric(input$MQRankSum),
+                                              ReadPosRankSum = as.numeric(input$ReadPosRankSum),
+                                              min_genotype_quality = as.numeric(input$min_genotype_quality),
                                               platform = input$platform,
                                               batch_size = input$batch_size,
                                               add_RGs = input$add_RGs,
