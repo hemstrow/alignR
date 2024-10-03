@@ -529,8 +529,16 @@ prep_genome_GATK <- function(reference,
     if(grepl("\\.gz$", reference)){
       system(paste0("gunzip ", reference))
       system(paste0("bgzip ", gsub("\\.gz$", "", reference)))
-      rm(paste0(reference, c(".amb", ".ann", ".fai", ".bwt", ".gzi", ".pac", ".sa")))
-      rm(paste0(tools::file_path_sans_ext(reference), ".dict"))
+
+      ex.libs <- paste0(reference, c(".amb", ".ann", ".fai", ".bwt", ".gzi", ".pac", ".sa"))
+      ex.libs <- ex.libs[which(file.exists(ex.libs))]
+      if(length(ex.libs) > 0){
+        rm(ex.libs)
+      }
+      ex.libs <- paste0(tools::file_path_sans_ext(reference), ".dict")
+      if(file.exists(e.libs)){
+        rm(ex.libs)
+      }
     }
     else{
       system(paste0("bgzip ", reference))
