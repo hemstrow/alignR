@@ -1,5 +1,6 @@
 #' @describeIn genotype_bams_GATK Build ".gvcf" haplotype files for each sample
 #'   with \code{GATK}'s \code{HaplotypeCaller}.
+#' @export
 run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "java", gatk4_path = "gatk.jar"){
   #==========sanity checks=========
   msg <- character()
@@ -117,6 +118,7 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
 
 #' @describeIn genotype_bams_GATK Add read groups to bam files with
 #'   \code{picard}.
+#' @export
 add_RGS <- function(bamfiles, fastqs, par = 1, platform = "ILLUMINA", java_path = "java", picard_path = "picard.jar"){
   #==========sanity checks=========
   msg <- character()
@@ -286,6 +288,7 @@ make_region_beds <- function(reference, min_chr_size = 0, chunk_size = "chr", ou
 
 #' @describeIn genotype_bams_GATK Build genome databases using \code{GATK}'s
 #'   \code{GenomicsDBImport}.
+#' @export
 run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5, java_path = "java", gatk4_path = "gatk.jar"){
   #============sanity checks==================
   msg <- character()
@@ -365,6 +368,7 @@ run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5,
 
 #' @describeIn genotype_bams_GATK Generate called genotypes from GenomeDBs using
 #'  \code{GATK}'s \code{GenotypeGVCFs}.
+#' @export
 run_GenotypeGVCFs <- function(bedfiles, reference, mem, par = 1, java_path = "java", gatk4_path = "gatk.jar"){
   #============sanity checks==================
   msg <- character()
@@ -496,6 +500,7 @@ run_VariantFiltration <- function(vcfs, reference, mem,
 
 #' @describeIn genotype_bams_GATK Prepare a reference genome for genotyping with
 #'   \code{picard} and other indexers.
+#' @export
 prep_genome_GATK <- function(reference,
                              java_path = "java",
                              picard_path = "picard.jar"){
@@ -563,6 +568,7 @@ prep_genome_GATK <- function(reference,
 #' @param outfile Character,
 #'   default \code{paste0(tools::file_path_sans_ext(vcfs[1], "_concat.vcf"))}.
 #'   Name for final, concatenated "vcf" file.
+#' @export
 concat_vcfs <- function(vcfs, outfile = paste0(tools::file_path_sans_ext(vcfs[1]), "_concat.vcf")){
   #===sanity checks======
   if(!.check_system_install("bcftools")){
