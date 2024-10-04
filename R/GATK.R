@@ -536,7 +536,7 @@ prep_genome_GATK <- function(reference,
         rm(ex.libs)
       }
       ex.libs <- paste0(tools::file_path_sans_ext(reference), ".dict")
-      if(file.exists(e.libs)){
+      if(file.exists(ex.libs)){
         rm(ex.libs)
       }
     }
