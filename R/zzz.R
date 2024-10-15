@@ -11,6 +11,19 @@
   }
   packageStartupMessage("The 'alignR_setup' vignette also has instructions for getting the dependencies installed.\nChecking dependencies now:\n")
 
+  # try conda
+  conda_path <- reticulate::conda_binary()
+  Sys.setenv(conda_install = FALSE)
+  if(file.exists(conda_path)){
+    conda_check <- system(paste0(conda_path, " --version"), ignore.stdout = TRUE, ignore.stderr = TRUE)
+    if(conda_check == 0){
+      paste0("conda is good-to-go... all other dependencies can be installed into an environment with `make_conda_env()`\n")
+      Sys.setenv(conda_install = TRUE)
+    }
+  }
+  if(!.check_system_install("conda")){
+    warning(paste0("No conda installation detected! Install conda to allow for easy alignR dependency installation.\n"))
+  }
 
   # try perl
   perl_check <- suppressWarnings(system("perl -v", ignore.stdout = TRUE, ignore.stderr = TRUE))
@@ -128,18 +141,5 @@
     packageStartupMessage(paste0("No STACKS installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("stacks")), collapse = "\n\t"),
                                  "\n"))
-  }
-
-  # try gatk
-  gatk_check <- suppressWarnings(system("gatk", ignore.stdout = TRUE, ignore.stderr = TRUE))
-  if(ngsParalog_check == 127){
-    Sys.setenv(gatk_install = FALSE)
-    packageStartupMessage(paste0("No gatk installation detected! Some functions will fail:\n\t",
-                                 paste0(unlist(.dependency_function_match("gatk")), collapse = "\n\t"),
-                                 "\n"))
-  }
-  else{
-    packageStartupMessage("gatk is good-to-go!\n")
-    Sys.setenv(gatk_install = TRUE)
   }
 }

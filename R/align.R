@@ -32,11 +32,11 @@
 #'   paired reads reads will be removed using \code{samtools view -f 0x2}. Only
 #'   valid for paired-end reads.
 #' @param par numeric, default 1. Number of cores to use for the alignments.
-#' 
+#'
 #' @return Generates 'x.sort.flt.bam' and 'x.sort.flt.bam.bai' files (sorted
 #'   alignments and index files, respectively), where 'x' is the prefix for the
 #'   RA. fastqs. In R, returns a vector of output file paths.
-#'   
+#'
 #' @author William Hemstrom
 #' @export
 align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
@@ -54,19 +54,19 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   if(!.check_system_install("bwa")){
     msg <- c(msg, "No bwa install located on system path.\n")
   }
-  
-  
+
+
   if(!.paired_length_check(RA_fastqs, RB_fastqs)){
     msg <- c(msg, "RA_fastqs and RB_fastqs must be of equal length.\n")
   }
-  
+
   check <- .check_is_genome(reference)
   if(is.character(check)){msg <- c(msg, check)}
-  
+
   if(length(msg) > 0){
     stop(msg)
   }
-  
+
   # check that the reference exists and is indexed.
   if(file.exists(reference)){
     index_files <- paste0(reference, c(".amb", ".ann", ".bwt", ".pac",".sa"))
@@ -78,11 +78,11 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   else{
     msg <- c(msg, "Reference genome file not found.\n")
   }
-  
+
   if(length(msg) > 0){
     stop(msg)
   }
-  
+
   #==============prepare to run=================
   reference <- normalizePath(reference)
   RA_fastqs <- normalizePath(RA_fastqs)
@@ -99,13 +99,13 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
       RB_fastqs[RB_gz_files] <- gsub("\\.gz", "", RB_fastqs[RB_gz_files])
     }
   }
-  
-  
-  
+
+
+
   if(!is.null(RB_fastqs)){
     is_single <- FALSE
     script <- .fetch_a_script("run_align.sh", "shell")
-    
+
     # prepare file handles
     fastqs <- data.frame(RA = RA_fastqs, RB = RB_fastqs)
     fastqs$RA <- gsub("\\.fastq$", "", fastqs$RA)
@@ -114,12 +114,12 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   else{
     is_single <- TRUE
     script <- .fetch_a_script("run_align_single.sh", "shell")
-    
+
     # prepare file handles
     fastqs <- data.frame(RA = RA_fastqs)
     fastqs$RA <- gsub("\\.fastq$", "", fastqs$RA)
   }
-  
+
 
   # register parallel architecture
   cl <- parallel::makePSOCKcluster(par)
@@ -139,7 +139,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
         cmd <- paste0("bash ", script, " ", chunks[[q]]$RA[i], " ", reference)
       }
       else{
-        cmd <- paste0("bash ", script, " ", chunks[[q]]$RA[i], " ", 
+        cmd <- paste0("bash ", script, " ", chunks[[q]]$RA[i], " ",
                       chunks[[q]]$RB[i], " ", reference, " ",
                       mapQ, " ",
                       ifelse(remove_duplicates, 1, 0), " ",
@@ -151,7 +151,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 
   # release cores and clean up
   parallel::stopCluster(cl)
-  
+
   return_files <- paste0(fastqs$RA, ".sort.flt.bam")
 }
 
@@ -164,7 +164,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 #' \code{populations}, the former of which can be run with
 #' \code{\link{genotype_bams}}. The functionality of the later of which can be
 #' done using several other R packages.
-#' 
+#'
 #' Paired-end reads are filtered following alignment by first removing PCR
 #' duplicates using \code{samtools fixmate} and \code{samtools markdup}, then
 #' poorly mapped reads using \code{samtools view} with \code{-q 5}, and then
@@ -176,7 +176,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 #' (and usually should) be done while calling genotypes or doing other
 #' down-stream analyses. The full alignment script can be accessed using
 #' \code{system.file("shell", "run_align_single.sh", "alignR")}.
-#' 
+#'
 #' Selecting the corretc M and n values for STACKS can be quite tricky.
 #' For advice on this, try checking out
 #' [this paper by Paris et al 2017](https://doi.org/10.1111/2041-210X.12775),
@@ -229,33 +229,33 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 #'   'x' is the prefix for the RA fastqs, depending on if re-alignment with
 #'   \code{bwa mem} via \code{align_reference} is requested with the
 #'   \code{re_align} argument. In R, returns a vector of output file paths.
-#'   
+#'
 #' @author William Hemstrom
 #' @export
-align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M, 
+align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                          n = M, par = 1, check_headers = FALSE,
                          stacks_cleanup = TRUE,
                          re_align = TRUE,
                          mapQ = 5,
-                         remove_duplicates = TRUE, 
+                         remove_duplicates = TRUE,
                          remove_improper_pairs = FALSE,
                          ask_confirmation = TRUE){
 
   #==========sanity checks==========================
   RA_fastqs <- normalizePath(RA_fastqs)
   if(!is.null(RB_fastqs)){RB_fastqs <- normalizePath(RB_fastqs)}
-  
+
   RA_ngz <- gsub("\\.gz$", "", RA_fastqs)
   RB_ngz <- gsub("\\.gz$", "", RB_fastqs)
-  
+
   msg <- character(0)
-  
+
   if(any(duplicated(c(RA_ngz, RB_ngz)))){
     msg <- c(msg, "Some likely duplicated file names provided. Is it possible that you passed both .(fastq).gz and .(fastq) versions of the same file to RA and/or RB?\n")
   }
-  
-  
-  
+
+
+
   if(!.check_system_install("bash")){
     msg <- c(msg, "No bash install located on system path.\n")
   }
@@ -269,26 +269,26 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
   if(isFALSE(stacks.ver)){
     msg <- c(msg, "No stacks install located on system path.\n")
   }
-  
+
   if(re_align){
     if(!.check_system_install("bwa")){
       msg <- c(msg, "No bwa install located on system path. This is needed if `re_align` is TRUE.\n")
     }
   }
-  
+
   if(!.paired_length_check(RA_fastqs, RB_fastqs)){
     msg <- c(msg, "RA_fastqs and RB_fastqs must be of equal length.\n")
   }
-  
+
   if(length(msg) > 0){
     stop(msg)
   }
-  
-  
+
+
   #===========make popmap and prep===================
   if(!is.null(RB_fastqs)){
     is_single <- FALSE
-    
+
     # prepare file handles
     fastqs <- data.frame(RA = RA_ngz, RB = RB_ngz)
     filepaths <- dirname(c(RA_fastqs, RB_fastqs))
@@ -317,11 +317,11 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
       map$target_A <- paste0(map$header[i], ".1.", fileext[i])
       map$target_B <- paste0(map$header[i], ".1.", fileext[i])
     }
-    
-    
+
+
     if(length(unique(map$header)) != nrow(map) | any(map$target_A != RA_ngz) | any(map$target_B != RB_ngz)){
-      
-      # ask for confirmation if 
+
+      # ask for confirmation if
       if(interactive() & ask_confirmation){
         cat("stacks expects that each RA/RB pair has a unique prefix and end in .1 or .2. alignR can make a 'renamed' directory at the same location as the original files and copy files here with appropriate names.\n")
         resp <- ""
@@ -340,26 +340,26 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
       else{
         resp <- "y"
       }
-      
-      
+
+
       if(resp == "n"){
         stop("stacks expects that each RA/RB pair has a unique prefix and end in .1 or .2.\n")
       }
       else{
         cat("Copying files.\n")
         new_dir <- paste0(filepaths[1], "/renamed")
-        
+
         if(!dir.exists(new_dir)){
           dir.create(new_dir)
         }
-        
+
         if(length(unique(map$header) != nrow(map))){
           map$header <- paste0("renamed_", 1:nrow(map))
           map$target_A <- paste0(map$header, ".1.", fileext[1])
           map$target_B <- paste0(map$header, ".2.", fileext[2])
         }
-        
-        
+
+
         cl <- parallel::makePSOCKcluster(par)
         doParallel::registerDoParallel(cl)
         output <- foreach::foreach(q = 1:nrow(map), .inorder = TRUE, .errorhandling = "pass",
@@ -371,7 +371,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
           else{
             system(paste0("cp ", RA_fastqs[q], " ", new_dir, "/", map$target_A[q], ".gz"))
           }
-          
+
           if(RB_ngz[q] == RB_fastqs[q]){
             system(paste0("cp ", RB_fastqs[q], " ", new_dir, "/", map$target_B[q]))
           }
@@ -379,20 +379,20 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
             system(paste0("cp ", RB_fastqs[q], " ", new_dir, "/", map$target_B[q], ".gz"))
           }
         }
-        
+
         parallel::stopCluster(cl)
-        
-        
+
+
         colnames(map)[5:6] <- c("RA_renamed", "RB_renamed")
-        
+
         rename_key <- map[,c("RA", "RB", "header", "RA_renamed", "RB_renamed")]
         utils::write.table(rename_key, paste0(filepaths[1], "/rename_key.txt"), col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
         cat("Renaming successfull. Key for renamed files located at", paste0(filepaths[1], "/rename_key.txt"), "\n\tNote that resulting bam files will be renamed back to their original RA prefixes!\n")
-        
+
         filepaths <- rep(new_dir, length(filepaths))
         map$RA <- map$RA_renamed
         map$RB <- map$RB_renamed
-        
+
         if(any(RA_ngz != RA_fastqs)){
           map$RA[which(RA_ngz != RA_fastqs)] <- paste0(map$RA[which(RA_ngz != RA_fastqs)], ".gz")
         }
@@ -401,20 +401,20 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
         }
       }
     }
-    
+
     popmap <- cbind(header = map$header, pop = "filler")
   }
   else{
     popmap <- cbind(header = RA_ngz, pop = "filler")
     map <- data.frame(RA = RA_fastqs)
   }
-  
-  
+
+
   # check for bad headers
   repl_headers <- function(file1, file2, rstring, rstring2){
     script <- .fetch_a_script("header_fixer_paired.pl", "perl")
-    
-    
+
+
     if(tools::file_ext(file1) == "gz"){
       rezip1 <- TRUE
       system(paste0("gunzip ", file1))
@@ -423,7 +423,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
     else{
       rezip1 <- FALSE
     }
-    
+
     if(tools::file_ext(file2) == "gz"){
       rezip2 <- TRUE
       system(paste0("gunzip ", file2))
@@ -432,47 +432,47 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
     else{
       rezip2 <- FALSE
     }
-    
+
     system(paste0("perl ", script, " ", file1, " ", file2, " ", rstring, " ", rstring2))
     system(paste0("mv ", rstring, " ", file1))
     system(paste0("mv ", rstring2, " ", file2))
-    
+
     if(rezip1 | rezip2){
       system(paste0("gzip ", ifelse(rezip1, file1,""), " ", ifelse(rezip2, file2, "")))
     }
   }
-  
+
   if(check_headers & !is.null(RB_fastqs)){
     cat("Checking and fixing any unrecognized headers in .fastq files.\n")
-    
+
     rstrings <- .rand_strings(length(c(RA_fastqs, RB_fastqs)), 10)
     bad_rstrings <- file.exists(file.path(filepaths[1], rstrings))
-    
+
     while(any(bad_rstrings)){
       rstrings[bad_rstrings] <- .rand_strings(sum(bad_rstrings), length(c(RA_fastqs, RB_fastqs)))
       bad_rstrings <- file.exists(file.path(filepaths[1], rstrings))
     }
-    
+
     cl <- parallel::makePSOCKcluster(par)
     doParallel::registerDoParallel(cl)
     output <- foreach::foreach(q = 1:nrow(map), .inorder = TRUE, .errorhandling = "pass",
                                .packages = "alignR"
     ) %dopar% {
-      repl_headers(file.path(filepaths[1], map$RA[q]), 
-                   file.path(filepaths[1], map$RB[q]), 
+      repl_headers(file.path(filepaths[1], map$RA[q]),
+                   file.path(filepaths[1], map$RB[q]),
                    file.path(filepaths[1], rstrings[q]),
                    file.path(filepaths[1], rstrings[(length(rstrings)/2) + q]))
       TRUE
     }
     parallel::stopCluster(cl)
-    
+
     cat("Done.\n")
   }
 
   # zip if not zipped
   fileext <- tools::file_ext(c(map$RA, map$RB))
   all_files <- file.path(filepaths[1], c(map$RA, map$RB))
-  
+
   if(any(fileext != "gz")){
     if(interactive() & ask_confirmation){
       cat("stacks expects that each file is zipped (.gz).\n")
@@ -494,11 +494,11 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
     else{
       resp <- "y"
     }
-    
+
     if(resp == "y"){
-      
+
       cat("gzipping", sum(fileext != "gz"), "files... ")
-      
+
       cl <- parallel::makePSOCKcluster(par)
       doParallel::registerDoParallel(cl)
       output <- foreach::foreach(q = 1:sum(fileext != "gz"), .inorder = TRUE, .errorhandling = "pass",
@@ -508,10 +508,10 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
       }
       parallel::stopCluster(cl)
       cat("Done.\n")
-      
+
       map$RA[which(tools::file_ext(map$RA) != "gz")] <-
         paste0(map$RA[which(tools::file_ext(map$RA) != "gz")], ".gz")
-      
+
       if(!is.null(RB_fastqs)){
         map$RB[which(tools::file_ext(map$RB) != "gz")] <-
           paste0(map$RB[which(tools::file_ext(map$RB) != "gz")], ".gz")
@@ -521,32 +521,32 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
       stop("stacks expects that each file is zipped (.gz).\n")
     }
   }
-  
+
   utils::write.table(popmap, "./alignR_popmap", quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
   #===========run stacks=====================
   script <- .fetch_a_script("denovo_map_edit.pl", "perl")
-  
-  cmd <- paste0(script, 
-                " --samples ", filepaths[1], 
-                " -T ", par, 
-                " -M ", M, 
-                " -n ", n, 
-                " -o ", filepaths[1], 
+
+  cmd <- paste0(script,
+                " --samples ", filepaths[1],
+                " -T ", par,
+                " -M ", M,
+                " -n ", n,
+                " -o ", filepaths[1],
                 " --popmap alignR_popmap",
                 ifelse(stacks.ver == "general", " -e stacks", ""))
   cmd <- ifelse(is_single, cmd, paste0(cmd, " --paired"))
-  
+
   system(cmd)
   gcmd <- paste0(ifelse(stacks.ver == "general", "stacks ", ""),
-                 "gstacks -P ", 
+                 "gstacks -P ",
                  filepaths[1],
                  " -M alignR_popmap -t ",
                  par,
                  ifelse(re_align, "", " --write-alignments"))
   system(gcmd)
-  
+
   #===========clean-up and post-processing===========
-  
+
   cat("Cleaning up and renaming if needed.\n")
   if(stacks_cleanup){
     rm.files <- list.files(filepaths[1], "matches\\.tsv.\\gz$", full.names = TRUE)
@@ -565,23 +565,23 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
     rm.files <- c(rm.files, "alignR_popmap")
     file.remove(rm.files)
   }
-  
+
 
   if(re_align){
     # index
     cat("Re-aligning reads using `align_reference`.\n")
     system(paste0("gunzip ", file.path(filepaths[1], "catalog.fa.gz")))
     system(paste0("bwa index ", file.path(filepaths[1], "catalog.fa")))
-    
-    return_files <- align_reference(RA_fastqs = RA_fastqs, 
+
+    return_files <- align_reference(RA_fastqs = RA_fastqs,
                                     RB_fastqs = RB_fastqs,
-                                    reference = file.path(filepaths[1], "catalog.fa"), 
-                                    par = par, 
-                                    mapQ = mapQ, 
-                                    remove_duplicates = remove_duplicates, 
+                                    reference = file.path(filepaths[1], "catalog.fa"),
+                                    par = par,
+                                    mapQ = mapQ,
+                                    remove_duplicates = remove_duplicates,
                                     remove_improper_pairs = remove_improper_pairs)
   }
-  
+
   else{
     # rename files according to the map
     if(exists("rename_key")){
@@ -598,17 +598,17 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
       new_bamnames <- file.path(filepaths[1],
                                 paste0(tools::file_path_sans_ext(gsub("\\.gz", "", map$RA)), ".alns.bam"))
     }
-    
+
     cat("Indexing reads with SAMtools.\n")
     sort_names <- gsub("\\.bam$", ".sort.bam", new_bamnames)
     for(i in 1:length(new_bamnames)){
       system(paste0("samtools sort -o ", sort_names[i], " ", new_bamnames[i]))
       system(paste0("samtools index ", sort_names[i]))
     }
-    
+
     return_files <- sort_names
   }
-  
+
 
 
   cat("Complete!\n")
