@@ -12,9 +12,9 @@
   packageStartupMessage("The 'alignR_setup' vignette also has instructions for getting the dependencies installed.\nChecking dependencies now:\n")
 
   # try conda
-  conda_path <- reticulate::conda_binary()
+  conda_path <- try(reticulate::conda_binary(), silent = TRUE)
   Sys.setenv(conda_install = FALSE)
-  if(file.exists(conda_path)){
+  if(!is(conda_path, "try-error")){
     conda_check <- system(paste0(conda_path, " --version"), ignore.stdout = TRUE, ignore.stderr = TRUE)
     if(conda_check == 0){
       paste0("conda is good-to-go... all other dependencies can be installed into an environment with `make_conda_env()`\n")
