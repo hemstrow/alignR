@@ -20,10 +20,10 @@
 #'
 #' }
 install_dependencies_conda <- function(name = "alignR"){
-  if(!.check_system_install("conda")){
-    # install conda?
-    stop("Conda install not detected.\n")
-  }
+  # if(!.check_system_install("conda")){
+  #   # install conda?
+  #   stop("Conda install not detected.\n")
+  # }
 
   reticulate::conda_create(name)
   reticulate::conda_install(name, c("r-base", "perl"))
