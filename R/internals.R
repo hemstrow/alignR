@@ -355,18 +355,10 @@
                   angsd = c("genotype_bams"),
                   samtools = c("align_reference", "align_denovo", "genotype_bams via ANGSD"),
                   bwa = c("align_reference", "align_denovo with re_align = TRUE"),
-                  gatk = c("genotype_bams via gatk"))
+                  gatk = c("genotype_bams via gatk"),
+                  fastp = "trim_fastp")
 
   return(dep_tab[names(dep_tab) %in% dependancies])
-}
-
-
-.rename_files <- function(from, to){
-  browser()
-  for(i in 1:length(from)){
-    cmd <- paste0("mv ", from[i], " ", to[i])
-    system(cmd)
-  }
 }
 
 
@@ -412,3 +404,4 @@
   options(scipen = old_scipen$scipen)
   return(paste0("region", 1:length(starts), ".rf"))
 }
+

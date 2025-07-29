@@ -18,7 +18,7 @@ align_reference(
 \item{RA_fastqs}{character. Vector of filepaths for the RA (read one) files.}
 
 \item{RB_fastqs}{character or NULL, default NULL. Vector of filepaths for the
-RB (read one) files.}
+RB (read two) files.}
 
 \item{reference}{character. Filepath for the reference genome to use for the
 alignment.}

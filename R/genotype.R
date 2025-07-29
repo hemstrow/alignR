@@ -319,8 +319,7 @@ genotype_bams_ANGSD <- function(bamfiles,
     system(paste0("perl ", vcf_script, " ",
                   paste0(outfile, ".geno"), " ",
                   paste0(outfile, ".vcf"), " ",
-                  ifelse(doGeno == 5, "NN ", "numeric "),
-                  tf))
+                  ifelse(doGeno == 5, "NN ", "numeric ")))
     file.remove(tf)
     return(paste0(outfile, ".vcf"))
   }

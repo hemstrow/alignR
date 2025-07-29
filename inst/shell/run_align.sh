@@ -7,10 +7,11 @@ mapQ=$4 # mapping quality min removing poorly mapped reads
 rmdup=$5 # 0 or 1. Should suspected PCR duplicates be removed?
 improperpairs=$6 # 0 or 1. Should improperly paired reads be removed?
 
-
 bwa mem $ref ${c1}.fastq ${c2}.fastq | samtools view -Sb - | samtools sort - -n -o ${c1}.sort.bam # align and sort by name
 samtools fixmate -r -m ${c1}.sort.bam ${c1}.fixmate.bam # fixmate, marks some info
 samtools sort -o ${c1}.psort.bam ${c1}.fixmate.bam # sort by position
+samtools markdup ${c1}.psort.bam ${c1}.markdup.bam
+samtools flagstat ${c1}.markdup.bam > ${c1}.markdup.bam.flagstat
 
 # filter PCR dups if requested, then do map quality filtering
 if [[ $rmdup -eq 1 ]]
@@ -38,6 +39,12 @@ fi
 # index
 samtools index ${c1}.sort.flt.bam
 
+# flagstat
+samtools flagstat ${c1}.sort.flt.bam > ${c1}.sort.flt.bam.flagstat
+
+# stats
+samtools stats ${c1}.sort.flt.bam > ${c1}.sort.flt.bam.stats
+
 # clean
 if [[ $rmdup -eq 1 ]]
 then
@@ -53,3 +60,4 @@ rm ${c1}.fixmate.bam
 rm ${c1}.q1.bam
 rm ${c1}.psort.bam
 rm ${c1}.namesort.bam
+rm ${c1}.sort.bam

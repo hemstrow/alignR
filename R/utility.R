@@ -91,6 +91,112 @@ equalize_read_counts <- function(RA_fastqs, RB_fastqs = NULL, nreads = "lowest",
   return(return_files)
 }
 
+#' Down sample mapped reads across multiple bam files.
+#'
+#' Randomly downsample bam files to a target value \code{high_cut}. Optionally
+#' also detect any files below \code{low_cut}. Files between the \code{high_cut}
+#' and \code{low_cut} will be copied without downsampling. Return a list of
+#' downsampled files without anything below \code{low_cut}. Duplicate removal
+#' is strongly recommended before downsampling.
+#'
+#' @param bams character. Vector of bamfile filepaths. If files are not indexed,
+#'   they will be beforehand.
+#' @param reference character or numeric. Path to reference genome to which
+#'   bamfiles were mapped OR the length of the genome/sequenced region, in bp.
+#' @param low_cut numeric, default 0. Lower bound below which bam files should
+#'   be dropped from further analysis.
+#' @param high_cut numeric, default Inf. Upper bound; bam files with higher
+#'   coverage will be downsampled to this coverage.
+#' @param tabulate_only logical, default FALSE. If TRUE, no downsampling is
+#'   performed; instead, a table of counts, depths, subsample levels is
+#'   returned. Useful to run prior to an actual downsampling run to determine
+#'   \code{high_cut} and \code{low_cut}.
+#'
+#' @export
+#' @author William Hemstrom
+#' @return Generates files downsampled to requested level. In R, returns a list
+#'   of file paths to subset files OR, if \code{tabulate_only} is TRUE, a table
+#'   of sample depth statistics.
+downsample_bams <- function(bams, reference, low_cut = 0, high_cut = Inf, tabulate_only = FALSE){
+  file <- bases_sequenced <- depth <- sub <- keep <- NULL
+  #=======sanity checks============
+  msg <- character(0)
+  if(!.check_system_install("bash")){
+    msg <- c(msg, "No bash install located on system path.\n")
+  }
+
+  if(!.check_system_install("samtools")){
+    msg <- c(msg, "No samtools install located on system path.\n")
+  }
+
+  if(length(msg) > 0){stop(msg)}
+
+  #=======prep============
+  # get stats if needed
+  need_stats <- which(!file.exists(paste0(bams, ".stats")))
+  if(length(needed_stats) > 0){
+    for(i in 1:length(needed_stats)){
+      cmd <- paste0("samtools stats ", bams[i], " > ", bams[i], ".stats")
+      system(cmd)
+    }
+  }
+
+  # get length if not provided
+  if(!is.numeric(reference)){
+    if(!file.exists(paste0(reference, ".fai"))){
+      cmd <- paste0("samtools faidx ", reference)
+      system(cmd)
+      reference <- data.table::fread(paste0(reference, ".fai"), select = 2)
+      reference <- sum(reference[[1]])
+    }
+  }
+
+
+  # process
+  info <- data.table::data.table(file = bams, bases_sequenced = 0, depth = 0)
+  for(i in 1:length(bams)){
+    tf <- readLines(paste0(bams[i], ".stats"), n = 40)
+    tf <- tf[grep("^SN\tbases mapped.+cigar.+", tf)]
+    tf <- gsub(".+:", "", tf)
+    tf <- gsub(" +", "", tf)
+    tf <- as.numeric(gsub("#.+", "", tf))
+
+    info[i, bases_sequenced := tf]
+  }
+
+  info[, depth := bases_sequenced/reference]
+
+  #=======downsample============
+
+  # read and figure out targets
+  info[,sub := high_cut/depth]
+  info[, keep := depth >= low_cut]
+  info[,ofile := rmake::replaceSuffix(file, ".sub.bam")]
+
+  if(!tabulate_only){
+    for(i in 1:nrow(info)){
+      if(info$sub[i] < 1){
+        cmd <- paste0("samtools view --subsample ", info$sub[i], " --subsample-seed 1 ",
+                      "-b ", info$file[i],
+                      "> ", info$ofile[i])
+        system(cmd)
+        cmd <- paste0("samtools index ", info$ofile[i])
+        system(cmd)
+      }
+      else if(info$keep[i]){
+        file.copy(info$file[i], info$ofile[i])
+        file.copy(paste0(info$file[i], ".bai"),
+                  paste0(info$ofile[i], ".bai"))
+      }
+    }
+
+    return(info[which(keep),]$ofile)
+  }
+
+  else{return(info[,.(file, bases_sequenced, depth, sub, keep)])}
+
+}
+
 #' Merge fastq files
 #'
 #' Merges fastq files as a set from each element of a list. Resulting merged

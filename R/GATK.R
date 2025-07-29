@@ -43,7 +43,6 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
   #=======================run=========
   script <- .fetch_a_script("run_HaplotypeCaller.sh", "shell")
 
-
   temp_dir <- tempdir()
 
 
@@ -74,7 +73,7 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
                     java_path, " ",
                     gatk4_path, " ")
 
-      system(cmd)
+      system(cmd, intern = TRUE)
       unlink(ttempdir, recursive = TRUE)
 
       # validate
@@ -473,7 +472,7 @@ run_VariantFiltration <- function(vcfs, reference, mem,
                              .packages = "alignR"
   ) %dopar% {
     for(i in 1:length(chunks[[q]])){
-      # run Haplotype Caller
+      # run VariantFiltration
       cmd <- paste0("bash ", script, " ",
                     chunks[[q]][i], " ",
                     reference, " ",
@@ -774,7 +773,7 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
 
   #==========setup==========
   # check ref
-  reference <- prep_genome_GATK(reference, java_path, picard_path)
+  reference <- prep_genome_GATK(reference, java_path, picard_path, slurm_args_index = slurm_args_index)
 
   # add RGs
   if(add_RGs){
@@ -782,7 +781,8 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
                         fastqs = fastqs,
                         par = par,
                         platform = platform,
-                        java_path = java_path, picard_path = picard_path)
+                        java_path = java_path, picard_path = picard_path,
+                        slurm_args_RGs = slurm_args_RGs)
   }
 
   bedfiles <- make_region_beds(reference, min_chr_size = min_chr_size, chunk_size, outdir = "./")
@@ -813,7 +813,7 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
 
   # concat if requested
   if(concatenate_final_vcfs & length(vcfs) > 1){
-    vcfs <- concat_vcfs(vcfs)
+    vcfs <- concat_vcfs(vcfs, slurm_args_concat = slurm_args_concat)
   }
 
   return(vcfs)

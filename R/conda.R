@@ -33,10 +33,14 @@ install_dependencies_conda <- function(name = "alignR"){
                                     "samtools",
                                     "stacks",
                                     "gatk4",
-                                    "picard"), channel = "bioconda")
+                                    "angsd",
+                                    "picard",
+                                    "fastp"), channel = "bioconda")
+  # cmd <- paste0("conda run -n ", name, " ", r"(R -e "install.packages('remotes', repos = 'http://cran.us.r-project.org');remotes::install_github('hemstrow/alignR');")")
 
   message("Conda environment: '", name, "' prepared with `alignR` dependencies. To load, type `conda activate ", name, "`, run R, and then install `alignR`.\n")
-  message("In shell, run:\nconda activate ", name, "\n",
-          r"(R -e "install.packages('remotes', repos = 'http://cran.us.r-project.org');remotes::install_github('hemstrow/alignR');")")
+  message("Conda env prepared with dependencies and can be activated with:\n\tconda activate ", name, "\nTo finish env, run this to install alignR:\n\t",
+          paste0("conda run -n ", name, " ",
+                 r"(R -e "install.packages('remotes', repos = 'http://cran.us.r-project.org');remotes::install_github('hemstrow/alignR');")"))
   return(name)
 }

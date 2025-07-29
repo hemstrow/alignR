@@ -7,9 +7,8 @@
     packageStartupMessage("Some of these can be tricky to install on windows. We suggest using a Linux virtual machine (check out Windows Subsystem for Linux, for example). A walkthough to getting alignR up and running on Windows is availablein the 'alignR_setup' vignette.\n")
   }
   else{
-    packageStartupMessage("These are fairly straightforward to install on Linux or MacOS using simple terminal commands--try searching for 'install X', where X is the missing tool. In many cases, sudo apt-get install works fine!\n")
+    packageStartupMessage("The install_dependencies_conda() function can create a conda environment for you with all installed dependencies.\n")
   }
-  packageStartupMessage("The 'alignR_setup' vignette also has instructions for getting the dependencies installed.\nChecking dependencies now:\n")
 
   # try conda
   conda_path <- try(reticulate::conda_binary(), silent = TRUE)
@@ -141,5 +140,18 @@
     packageStartupMessage(paste0("No STACKS installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("stacks")), collapse = "\n\t"),
                                  "\n"))
+  }
+
+  # try fastp
+  ngsParalog_check <- suppressWarnings(system("fastp", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(ngsParalog_check == 127){
+    Sys.setenv(fastp_install = FALSE)
+    packageStartupMessage(paste0("No fastp installation detected! Some functions will fail:\n\t",
+                                 paste0(unlist(.dependency_function_match("fastp")), collapse = "\n\t"),
+                                 "\n"))
+  }
+  else{
+    packageStartupMessage("fastp is good-to-go!\n")
+    Sys.setenv(fastp_install = TRUE)
   }
 }

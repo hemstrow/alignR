@@ -19,7 +19,7 @@
 #'
 #' @param RA_fastqs character. Vector of filepaths for the RA (read one) files.
 #' @param RB_fastqs character or NULL, default NULL. Vector of filepaths for the
-#'   RB (read one) files.
+#'   RB (read two) files.
 #' @param reference character. Filepath for the reference genome to use for the
 #'   alignment.
 #' @param mapQ numeric, default 5. Reads with mapping qualities lower than mapQ
@@ -153,7 +153,220 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   parallel::stopCluster(cl)
 
   return_files <- paste0(fastqs$RA, ".sort.flt.bam")
+  return(return_files)
 }
+
+
+#' Trim reads with fastp
+#'
+#' @param RA_fastqs character. Vector of filepaths for the RA (read one) files.
+#' @param RB_fastqs character or NULL, default NULL. Vector of filepaths for the
+#'   RB (read two) files.
+#' @param adapter_r1 character or NULL, default
+#'   "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA". Adapter sequences for read 1,
+#'   automatically detected by fastp if NULL. The defaults are the TruSeq
+#'   adapters, which are far and away the most common.
+#' @param adapter_r2 character or NULL, default
+#'   "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT". Adapter sequences for read 1,
+#'   automatically detected by fastp if NULL. The defaults are the TruSeq
+#'   adapters, which are far and away the most common.
+#' @param cut_front numeric or FALSE, default FALSE. If a number, a sliding
+#'   window size by which to scan (starting from the 5' end) for average quality
+#'   windows below `cut_front_mean_quality`. Bases will be dropped until a
+#'   window above `cut_front_mean_quality` is detected. NOTE: this will
+#'   interfere with duplicate detection and removal during later stages.
+#' @param cut_front_mean_quality numeric or NULL, default NULL. If a number,
+#'   sliding windows of size `cut_front` will be scanned (starting from the 5'
+#'   end) for average quality windows below `cut_front_mean_quality`. Bases will
+#'   be dropped until a window above `cut_front_mean_quality` is detected. NOTE:
+#'   this will interfere with duplicate detection and removal during later
+#'   stages.
+#' @param cut_tail numeric or FALSE, default FALSE. If a number, a sliding
+#'   window size by which to scan (starting from the 3' end) for average quality
+#'   windows below `cut_front_mean_quality`. Bases will be dropped until a
+#'   window above `cut_front_mean_quality` is detected.
+#' @param cut_tail_mean_quality numeric or NULL, default NULL. If a number,
+#'   sliding windows of size `cut_tail` will be scanned (starting from the 3'
+#'   end) for average quality windows below `cut_tail_mean_quality`. Bases will
+#'   be dropped until a window above `cut_tail_mean_quality` is detected.
+#' @param cut_right numeric or FALSE, default 4. If a number, a sliding
+#'   window size by which to scan for average quality windows below
+#'   `cut_front_right_quality`. All bases to the right of any bad window will be
+#'   removed.
+#' @param cut_front_right_quality numeric or NULL, default 20. If a number,
+#'   sliding windows of size `cut_right` will be scanned for average quality
+#'   windows below `cut_front_right_quality`. All bases to the right of any bad
+#'   window will be removed.
+#' @param trim_poly_g numeric or FALSE, default 10. If TRUE, polyG tails will be
+#'   detected and removed if they are longer that `trim_poly_g`.
+#' @param trim_poly_x numeric or FALSE, default FALSE. If a number, polyX (A, T,
+#'   C, G) tails will be detected and removed if they are longer than
+#'   `trim_poly_x`. Detection happens after polyG tail removal if `trim_poly_g`
+#'   is also true
+#' @param par numeric, default 1. Number of cores to use for the alignments.
+#'
+#' @return Generates 'x_trimmed.fastq' files (sorted
+#'   alignments and index files, respectively), where 'x' is the prefix for the
+#'   RA/RB fastqs. In R, returns a vector of output file paths.
+#'
+#' @author William Hemstrom
+#' @export
+trim_fastp <- function(RA_fastqs, RB_fastqs = NULL,
+                       adapter_r1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+                       adapter_r2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
+                       cut_front = FALSE,
+                       cut_front_mean_quality = NULL,
+                       cut_tail = FALSE,
+                       cut_tail_mean_quality = NULL,
+                       cut_right = 4,
+                       cut_right_mean_quality = 20,
+                       trim_poly_g = 10,
+                       trim_poly_x = FALSE,
+                       par = 1){
+  #=============sanity checks===================
+  msg <- character()
+
+  if(!.check_system_install("bash")){
+    msg <- c(msg, "No bash install located on system path.\n")
+  }
+  if(!.check_system_install("fastp")){
+    msg <- c(msg, "No SAMtools install located on system path.\n")
+  }
+
+  if(!.paired_length_check(RA_fastqs, RB_fastqs)){
+    msg <- c(msg, "RA_fastqs and RB_fastqs must be of equal length.\n")
+  }
+
+  if(is.numeric(cut_front)){
+    if(!is.numeric(cut_front_mean_quality)){
+      msg <- c(msg, "cut_front_mean_quality must be defined if cut_front is used.\n")
+    }
+  }
+  if(is.numeric(cut_right)){
+    if(!is.numeric(cut_right_mean_quality)){
+      msg <- c(msg, "cut_right_mean_quality must be defined if cut_right is used.\n")
+    }
+    if(is.numeric(cut_tail)){
+      cut_tail <- FALSE
+    }
+  }
+  if(is.numeric(cut_tail)){
+    if(!is.numeric(cut_tail_mean_quality)){
+      msg <- c(msg, "cut_tail_mean_quality must be defined if cut_tail is used.\n")
+    }
+  }
+
+  if(length(msg) > 0){
+    stop(msg)
+  }
+
+  #==============prepare to run=================
+  RA_fastqs <- normalizePath(RA_fastqs)
+  RA_gz_files <- which(tools::file_ext(RA_fastqs) == "gz")
+  if(length(RA_gz_files) > 0){
+    system(paste0("gunzip ", paste0(RA_fastqs[RA_gz_files], collapse = " ")))
+    RA_fastqs[RA_gz_files] <- gsub("\\.gz", "", RA_fastqs[RA_gz_files])
+  }
+  if(!is.null(RB_fastqs)){
+    RB_fastqs <- normalizePath(RB_fastqs)
+    RB_gz_files <- which(tools::file_ext(RB_fastqs) == "gz")
+    if(length(RB_gz_files) > 0){
+      system(paste0("gunzip ", paste0(RB_fastqs[RB_gz_files], collapse = " ")))
+      RB_fastqs[RB_gz_files] <- gsub("\\.gz", "", RB_fastqs[RB_gz_files])
+    }
+  }
+
+
+
+  if(!is.null(RB_fastqs)){
+    is_single <- FALSE
+
+    # prepare file handles
+    fastqs <- data.frame(RA = RA_fastqs, RB = RB_fastqs)
+    fastqs$RA <- gsub("\\.fastq$", "", fastqs$RA)
+    fastqs$RB <- gsub("\\.fastq$", "", fastqs$RB)
+  }
+  else{
+    is_single <- TRUE
+
+    # prepare file handles
+    fastqs <- data.frame(RA = RA_fastqs)
+    fastqs$RA <- gsub("\\.fastq$", "", fastqs$RA)
+  }
+
+
+  # register parallel architecture
+  cl <- parallel::makePSOCKcluster(par)
+  doParallel::registerDoParallel(cl)
+
+  # divide up into ncore chunks
+  iters <- length(RA_fastqs)
+  it_par <- (1:iters)%%par
+  chunks <- split(fastqs, it_par)
+
+  # run
+  output <- foreach::foreach(q = 1:par, .inorder = FALSE, .errorhandling = "pass",
+                             .packages = "alignR"
+  ) %dopar% {
+    for(i in 1:nrow(chunks[[q]])){
+      # base cmd
+      cmd <- paste0("fastp ",
+                    "-i ", chunks[[q]]$RA[i], ".fastq ",
+                    "-o ",  paste0(chunks[[q]]$RA[i], "_trimmed.fastq"), " ",
+                    "-h ",  paste0(chunks[[q]]$RA[i], "_fastp.html"), " ",
+                    "-j ", paste0(chunks[[q]]$RA[i], "_fastp.json"))
+
+      # add second read?
+      if(!is_single){
+        cmd <- paste0(cmd, " ",
+                      "-I ", chunks[[q]]$RB[i], ".fastq ",
+                      "-O ",  paste0(chunks[[q]]$RB[i], "_trimmed.fastq"), " ",
+                      "--detect_adapter_for_pe")
+      }
+
+      # add args
+      if(is.numeric(cut_front)){
+        cmd <- paste0(cmd,
+                      " --cut_front --cut_front_window_size ", cut_front, " ",
+                      "--cut_front_mean_quality ", cut_front_mean_quality)
+      }
+      if(is.numeric(cut_right)){
+        cmd <- paste0(cmd,
+                      " --cut_right --cut_right_window_size ", cut_right, " ",
+                      "--cut_right_mean_quality ", cut_right_mean_quality)
+      }
+      if(is.numeric(cut_tail)){
+        cmd <- paste0(cmd,
+                      " --cut_tail --cut_tail_window_size ", cut_tail, " ",
+                      "--cut_tail_mean_quality ", cut_tail_mean_quality)
+      }
+      if(is.numeric(trim_poly_g)){
+        cmd <- paste0(cmd,
+                      " --trim_poly_g --poly_g_min_len ", trim_poly_g)
+      }
+      else{
+        cmd <- paste0(cmd, " --disable_trim_poly_g")
+      }
+      if(is.numeric(trim_poly_x)){
+        cmd <- paste0(cmd,
+                      " --trim_poly_x --poly_x_min_len ", trim_poly_x)
+      }
+
+
+      system(cmd)
+    }
+  }
+
+  # release cores and clean up
+  parallel::stopCluster(cl)
+
+  return_files <- list(RA = paste0(RA_fastqs, "_trimmed.fastq"))
+  if(!is_single){
+    return_files <- c(return_files, list(RB = paste0(RB_fastqs, "_trimmed.fastq")))
+  }
+  return(return_files)
+}
+
 
 
 #' Filter and align single or paired-end to a denovo assembly via stacks.
@@ -185,7 +398,7 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
 #'
 #' @param RA_fastqs character. Vector of filepaths for the RA (read one) files.
 #' @param RB_fastqs character or NULL, default NULL. Vector of filepaths for the
-#'   RB (read one) files.
+#'   RB (read two) files.
 #' @param M numeric. The \code{-M} parameter from STACKS, the "number of
 #'   mismatches allowed between stacks within individuals" (see STACKS
 #'   documentation).
@@ -579,7 +792,9 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                                     par = par,
                                     mapQ = mapQ,
                                     remove_duplicates = remove_duplicates,
-                                    remove_improper_pairs = remove_improper_pairs)
+                                    remove_improper_pairs = remove_improper_pairs,
+                                    slurm_args_index = slurm_args_index,
+                                    slurm_args_realign = slurm_args_realign)
   }
 
   else{

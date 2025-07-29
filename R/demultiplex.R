@@ -20,7 +20,7 @@
 #'   if either the \code{read_start} or \code{header} \code{barcode_location}
 #'   options are selected.
 #' @param indices character. Vector of \emph{R2, seperate read} barcodes or file
-#'   path to file containing such with one barcode on each line. Needed if 
+#'   path to file containing such with one barcode on each line. Needed if
 #'   the \code{R2} \code{barcode_location} option is selected.
 #' @param barcode_locations character. String indicating the locations of
 #'   barcodes. Options: \itemize{\item{\code{read_start}: } barcodes located at
@@ -62,17 +62,17 @@
 #'   R3 reverse reads. RA reads had barcodes (that were trimmed by
 #'   \code{demultiplex}), RB reads did not. Returns a list containing the paths
 #'   to each output file.
-#'   
+#'
 #' @export
 #'
 #' @author William Hemstrom
 #' @author Michael Miller
-demultiplex <- function(R1, R2 = NULL, R3 = NULL, 
-                        barcodes = NULL, indices = NULL, 
-                        barcode_locations, 
-                        outfile_prefix = "alignR", 
-                        sample_names = NULL, 
-                        stacks_header = TRUE, 
+demultiplex <- function(R1, R2 = NULL, R3 = NULL,
+                        barcodes = NULL, indices = NULL,
+                        barcode_locations,
+                        outfile_prefix = "alignR",
+                        sample_names = NULL,
+                        stacks_header = TRUE,
                         par = 1){
   #============sanity checks========
   msg <- character()
@@ -81,7 +81,7 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
   if(!.check_system_install("perl")){
     msg <- c(msg, "No perl install located on system path.\n")
   }
-  
+
   # R1/R2/R3 lengths
   if(!.paired_length_check(R1, R2)){
     msg <- c(msg, "R1, R2, and R3 (if provided) must be of equal length.\n")
@@ -89,7 +89,7 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
   else if(!.paired_length_check(R1, R3)){
     msg <- c(msg, "R1, R2 (if provided), and R3 must be of equal length.\n")
   }
-  
+
   # check that we have barcodes and they are OK
   if(length(barcodes) == 1){
     if(file.exists(normalizePath(barcodes))){
@@ -104,8 +104,8 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
       msg <- c(msg, "Unaccepted characters found in barcodes. Accepted characters: A, T, C, G.\n")
     }
   }
-  
-  
+
+
   # check that we have indices and they are ok
   if(length(indices) == 1){
     if(file.exists(normalizePath(indices))){
@@ -120,23 +120,23 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
       msg <- c(msg, "Unaccepted characters found in indices. Accepted characters: A, T, C, G.\n")
     }
   }
-  
-  
+
+
   # function to check sample names for the list of DFs
   .check_sample_names <- function(sample_names, barcodes, indices){
     msg <- character()
-    
+
     # sample names and prefixes
     if(!is.null(sample_names)){
-      
+
       # one or the other
       if(xor(is.null(barcodes), is.null(indices))){
-        
+
         # correct number of rows?
         if(nrow(sample_names) != length(barcodes) + length(indices)){
           msg <- c(msg, "Number of rows in sample_names must equal the number of provided barcodes/indices.\n")
         }
-        
+
         # have 2 columns?
         if(ncol(sample_names) != 2){
           msg <- c(msg, "If only one of barcodes or indices are provided, sample_names must have two columns.\n")
@@ -155,16 +155,16 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
               msg <- c(msg, paste0("Some indices not found in sample_names data.frame: \n\t", paste0(indices[bad.indices], collapse = "\n\t"), "\n"))
             }
           }
-          
+
         }
       }
       if(!is.null(barcodes) & !is.null(indices)){
-        
+
         # have correct number of rows?
         if(nrow(sample_names) != length(barcodes) * length(indices)){
           msg <- c(msg, "Number of rows in sample_names must equal the number of possible combinations for the provided barcodes/indices.\n")
         }
-        
+
         # have the correct number of columns?
         if(ncol(sample_names) != 3){
           msg <- c(msg, "Three columns (names, barcodes, indices, in that order) are needed in sample_names.\n")
@@ -181,10 +181,10 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
         }
       }
     }
-    
+
     return(msg)
   }
-  
+
   # issues with sample names?
   if(!is.data.frame(sample_names) & is.list(sample_names)){
     ln_sample_names <- length(sample_names)
@@ -197,8 +197,8 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
       }
     }
     sn_checks <- unlist(sn_checks)
-    
-    
+
+
     if(ln_sample_names != length(R1)){
       sn_checks <- c(sn_checks, "The length of the sample_names list must be equal to the number of R1/R2/R3 files (each data.frame in the list corresponds in order to one R1/R2/R3 file).\n")
     }
@@ -208,22 +208,22 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
     if(!is.data.frame(sample_names)){stop(c(msg, "sample_names must be a data.frame or list of data.frames.\n"))}
     ln_sample_names <- 1
     msg <- c(msg, .check_sample_names(sample_names, barcodes, indices))
-    
+
     sample_names <- list(sample_names)
   }
-  
+
   # all names unique?
   if(!is.null(sample_names)){
     all_names <- unlist(purrr::map(sample_names, 1))
     dup_names <- duplicated(all_names)
-    
+
     if(sum(dup_names) != 0){
       msg <- c(msg, paste0("Some duplicated sample names detected: \n\t", paste0(all_names[dup_names], collapse = "\n\t"), "\n"))
     }
   }
-  
-  
-  
+
+
+
   # barcode options
   good.options <- c("header", "read_start", "R2")
   bad_barcode_locations <- which(!barcode_locations %in% good.options)
@@ -233,7 +233,7 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
   if(all(c("header", "read_start") %in% barcode_locations)){
     msg <- c(msg, "Cannot demultiplex reads with barcodes both in the header and at the start of reads.\n")
   }
-  
+
   # check that we have the right barcodes/indices and reads
   if("header" %in% barcode_locations | "read_start" %in% barcode_locations){
     if(is.null(barcodes)){
@@ -248,73 +248,73 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
       msg <- c(msg, "Path(s) to R2 reads must be provided if barcodes are located in R2 reads.\n")
     }
   }
-  
+
   dirs <- dirname(c(R1, R2, R3))
   if(length(unique(dirs)) != 1){
     msg <- c(msg, "All input fastq files must be in the same directory.\n")
   }
-  
+
   # stop if bad
   if(length(msg) > 0){
     stop(msg)
   }
-  
+
   # check par
-  
+
   R1 <- normalizePath(R1)
   original_R1 <- R1
   if(!is.null(R2)){R2 <- normalizePath(R2)}
   if(!is.null(R3)){R3 <- normalizePath(R3)}
-  
+
   dir <- dirname(R1[1])
   has_prefix <- FALSE
-  
+
   if(outfile_prefix != ""){
     outfile_prefix <- paste0(outfile_prefix, "_")
   }
   #============figure out output file names beforehand============
-  
+
   bns <- basename(R1)
   outfiles <- data.frame(initial_bn = bns)
-  
+
 
   # if we have R2 barcodes
   if("R2" %in% barcode_locations){
-    
+
     outfiles <- expand.grid(outfiles$initial_bn, indices, stringsAsFactors = F) # possible options
-    
-    
+
+
     # R1 and R2 (and R3 if paried) files
-    outfiles$R1 <- file.path(dir, paste0(outfile_prefix, 
+    outfiles$R1 <- file.path(dir, paste0(outfile_prefix,
                                          tools::file_path_sans_ext(outfiles$Var1), "_R1_",
                                          outfiles$Var2,
                                          ".fastq"))
-    outfiles$R2 <- file.path(dir, paste0(outfile_prefix, 
+    outfiles$R2 <- file.path(dir, paste0(outfile_prefix,
                                          tools::file_path_sans_ext(outfiles$Var1), "_R2_",
                                          outfiles$Var2,
                                          ".fastq"))
     if(!is.null(R3)){
-      outfiles$R3 <- file.path(dir, paste0(outfile_prefix, 
+      outfiles$R3 <- file.path(dir, paste0(outfile_prefix,
                                            tools::file_path_sans_ext(outfiles$Var1), "_R3_",
                                            outfiles$Var2,
                                            ".fastq"))
     }
-    
+
     colnames(outfiles)[1:2] <- c("original_R1", "index")
-    
+
     # if we also have read start/header barcodes, return RA (and RB if paired)
     if(length(barcode_locations) > 1){
       expanded_outfiles <- expand.grid(outfiles$R1, barcodes) # possible options
       expanded_outfiles$original_R1 <- outfiles$original_R1[match(expanded_outfiles$Var1, outfiles$R1)]
       expanded_outfiles$index <- outfiles$index[match(expanded_outfiles$Var1, outfiles$R1)]
-      
+
       expanded_outfiles$RA <- paste0(tools::file_path_sans_ext(expanded_outfiles$Var1), "_RA_",
                                      expanded_outfiles$Var2, ".fastq")
       if(!is.null(R3)){
         expanded_outfiles$RB <- paste0(tools::file_path_sans_ext(expanded_outfiles$Var1), "_RB_",
                                        expanded_outfiles$Var2, ".fastq")
       }
-      colnames(expanded_outfiles)[1:2] <- c("input_R1", "barcode") 
+      colnames(expanded_outfiles)[1:2] <- c("input_R1", "barcode")
     }
   }
   # only read start/header barcodes
@@ -329,104 +329,104 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
                                            outfiles[,2], ".fastq"))
     }
     colnames(outfiles)[1:2] <- c("original_R1", "barcode")
-    
+
   }
-  
+
   #============split by R2========
 
   if("R2" %in% barcode_locations){
-    
+
     # prep
     ps_par <- min(par, length(R1))
-    
+
     cl <- parallel::makePSOCKcluster(ps_par)
     doParallel::registerDoParallel(cl)
-    
+
     if(is.null(R2)){
       script <- .fetch_a_script("demulti_single_end_R2_barcodes.pl", "perl")
     }
     else{
       script <- .fetch_a_script("demulti_paired_end_R2_barcodes.pl", "perl")
     }
-    
+
     # run
     output <- foreach::foreach(q = 1:length(R1), .inorder = TRUE, .errorhandling = "pass",
                                .packages = "alignR"
     ) %dopar% {
       out <- paste0(file.path(dir, outfile_prefix), basename(tools::file_path_sans_ext(R1)[q]))
-      
+
       if(is.null(R2)){
         cmd <- paste0("perl ", script, " ", R1[q], " ", R3[q], " ", paste0(indices, collapse = ","), " ", out)
       }
       else{
         cmd <- paste0("perl ", script, " ", R1[q], " ", R2[q], " ", R3[q], " ", paste0(indices, collapse = ","), " ", out)
       }
-      
+
       system(cmd)
-      
+
       out
     }
-    
+
     # wrap
     parallel::stopCluster(cl)
 
     if(length(barcode_locations) != 1){
       R1 <- outfiles$R1
       if(!is.null(R3)){R3 <- outfiles$R3}
-      
+
       has_prefix <- TRUE
     }
   }
-  
+
   #============split by header/start of read============
 
   if(any(c("header", "read_start") %in% barcode_locations)){
-    
+
     par <- min(par, length(R1))
     cl <- parallel::makePSOCKcluster(par)
     doParallel::registerDoParallel(cl)
-    
+
     if(is.null(R3)){
       script <- .fetch_a_script("demulti_single_end_single_file.pl", "perl")
     }
     else{
-      script <- .fetch_a_script("demulti_paired_end_single_file.pl", "perl") 
+      script <- .fetch_a_script("demulti_paired_end_single_file.pl", "perl")
     }
-    
-    
-    output <- foreach::foreach(q = 1:length(R1), .inorder = TRUE, .errorhandling = "pass", 
+
+
+    output <- foreach::foreach(q = 1:length(R1), .inorder = TRUE, .errorhandling = "pass",
                                .packages = "alignR"
     ) %dopar% {
-      
+
       out <- file.path(dir, paste0(ifelse(has_prefix, "", outfile_prefix), basename(tools::file_path_sans_ext(R1)[q])))
-      
+
       # run
       if(is.null(R3)){
-        cmd <-paste0("perl ", 
-                     script, " ", 
+        cmd <-paste0("perl ",
+                     script, " ",
                      R1[q], " ",
-                     paste0(barcodes, collapse = ","), " ", 
-                     out, " ", 
+                     paste0(barcodes, collapse = ","), " ",
+                     out, " ",
                      ifelse(stacks_header, 1, 0),
                      ifelse("header" %in% barcode_locations, " 1", " 0"))
       }
       else{
-        cmd <-paste0("perl ", 
-                     script, " ", 
-                     R1[q], " ", 
-                     R3[q], " ", 
-                     paste0(barcodes, collapse = ","), " ", 
-                     out, " ", 
+        cmd <-paste0("perl ",
+                     script, " ",
+                     R1[q], " ",
+                     R3[q], " ",
+                     paste0(barcodes, collapse = ","), " ",
+                     out, " ",
                      ifelse(stacks_header, 1, 0),
                      ifelse("header" %in% barcode_locations, " 1", " 0"))
-        
+
       }
       system(cmd)
       out
     }
-    
+
     parallel::stopCluster(cl)
-    
+
     if("R2" %in% barcode_locations){
       outfiles <- expanded_outfiles
     }
@@ -436,34 +436,34 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
 
   # rename according to key
   if(!is.null(sample_names)){
-    
+
     # R2 barcodes
     if("R2" %in% barcode_locations){
-      
+
       tfn <- vector("list", length = ln_sample_names)
       for(i in 1:ln_sample_names){
-        
+
         these_files <- outfiles[which(outfiles$original_R1 == basename(original_R1[i])),, drop = F]
         these_names <- sample_names[[i]]
-        
+
         # in read as well?
         if(length(barcode_locations) > 1){
           colnames(these_names) <- c("ID", "index", "barcode")
           rename_key <- merge(these_names, these_files, by = c("index", "barcode"))
           rename_key$new_RA <- file.path(dir, paste0(outfile_prefix, rename_key$ID, "_RA.fastq"))
 
-          .rename_files(rename_key$RA, rename_key$new_RA)
-          
+          file.rename(rename_key$RA, rename_key$new_RA)
+
           tfn[[i]] <- list(RA = rename_key$new_RA)
-          
+
           if("RB" %in% colnames(rename_key)){
             rename_key$new_RB <- file.path(dir, paste0(outfile_prefix, rename_key$ID, "_RB.fastq"))
-            
-            .rename_files(rename_key$RB, rename_key$new_RB)
+
+            file.rename(rename_key$RB, rename_key$new_RB)
             tfn[[i]]$RB <- rename_key$new_RB
           }
         }
-        
+
         # just R2?
         else{
           colnames(these_names) <- c("ID", "index")
@@ -471,96 +471,96 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
           rename_key <- merge(these_names, these_files, by = "index")
           rename_key$new_R1 <- file.path(dir, paste0(outfile_prefix, rename_key$ID, "_R1.fastq"))
           rename_key$new_R2 <- file.path(dir, paste0(outfile_prefix, rename_key$ID, "_R2.fastq"))
-          
-          .rename_files(rename_key$R1, rename_key$new_R1)
-          .rename_files(rename_key$R2, rename_key$new_R2)
-          
+
+          file.rename(rename_key$R1, rename_key$new_R1)
+          file.rename(rename_key$R2, rename_key$new_R2)
+
           tfn[[i]] <- list(R1 = rename_key$new_R1, R2 = rename_key$new_R2)
-          
+
           if("R3" %in% names(rename_key)){
             rename_key$new_R3 <- file.path(dir, paste0(outfile_prefix, rename_key$ID, "_R3.fastq"))
-            
-            .rename_files(rename_key$R3, rename_key$new_R3)
+
+            file.rename(rename_key$R3, rename_key$new_R3)
             tfn[[i]]$R3 <- rename_key$new_R3
           }
         }
       }
-      
+
       file_names <- dplyr::bind_rows(tfn)
     }
     # other barcodes
     else{
-      
+
       tfn <- vector("list", length = ln_sample_names)
       for(i in 1:ln_sample_names){
         these_files <- outfiles[which(outfiles$original_R1 == basename(original_R1[i])),, drop = F]
         these_names <- sample_names[[i]]
-        
+
         colnames(these_names) <- c("ID", "barcode")
         colnames(these_files)[1:2] <- c("file_name", "barcode")
         rename_key <- merge(these_names, these_files, by = "barcode")
         rename_key$new_RA <- file.path(dir, paste0(outfile_prefix, rename_key$ID, "_RA.fastq"))
-        
-        .rename_files(rename_key$RA, rename_key$new_RA)
-        
+
+        file.rename(rename_key$RA, rename_key$new_RA)
+
         tfn[[i]] <- list(RA = rename_key$new_RA)
-        
+
         if("RB" %in% names(rename_key)){
           rename_key$new_RB <- file.path(dir, paste0(outfile_prefix, rename_key$ID, "_RB.fastq"))
-          
-          .rename_files(rename_key$RB, rename_key$new_RB)
+
+          file.rename(rename_key$RB, rename_key$new_RB)
           tfn[[i]]$RB <- rename_key$new_RB
         }
       }
-      
+
       file_names <- dplyr::bind_rows(tfn)
     }
-    
-    
+
+
     file_names <- as.list(file_names)
   }
-  
-  
+
+
   # if no key, fix any R1_R1 etc in names
   else{
     if("R2" %in% barcode_locations){
-      
+
       # R2 + other
       if(length(barcode_locations) > 1){
         R1_R1s <- grep("R1_R1", outfiles$RA)
-        
+
         if(length(R1_R1s) != 0){
           new_RA <- gsub("R1_R1", "R1", outfiles$RA[R1_R1s])
-          .rename_files(outfiles$RA[R1_R1s], new_RA)
+          file.rename(outfiles$RA[R1_R1s], new_RA)
           outfiles$RA[R1_R1s] <- new_RA
-          
+
           if(!is.null(R3)){
             new_RB <- gsub("R1_R1", "R1", outfiles$RB[R1_R1s])
-            .rename_files(outfiles$RB[R1_R1s], new_RB)
+            file.rename(outfiles$RB[R1_R1s], new_RB)
             outfiles$RB[R1_R1s] <- new_RB
           }
         }
-        
+
         file_names <- list(RA = outfiles$RA)
         if("RB" %in% colnames(outfiles)){file_names$RB <- outfiles$RB}
       }
-      
+
       # RA only
       else{
         R1_R1s <- grep("R1_R1", basename(outfiles$R1))
         if(length(R1_R1s != 0)){
           new_R1 <- file.path(dir, gsub("R1_R1", "R1", basename(outfiles$R1[R1_R1s])))
-          .rename_files(outfiles$R1[R1_R1s], new_R1)
-          
+          file.rename(outfiles$R1[R1_R1s], new_R1)
+
           new_R2 <- file.path(dir, gsub("R1_R2", "R2", basename(outfiles$R2[R1_R1s])))
-          .rename_files(outfiles$R2[R1_R1s], new_R2)
-          
+          file.rename(outfiles$R2[R1_R1s], new_R2)
+
           if(!is.null(R3)){
             new_R3 <- file.path(dir, gsub("R1_R3", "R3", basename(outfiles$R3[R1_R1s])))
-            .rename_files(outfiles$R3[R1_R1s], new_R3)
+            file.rename(outfiles$R3[R1_R1s], new_R3)
           }
         }
-        
+
         file_names <- list(R1 = outfiles$R1, R2 = outfiles$R2)
         if("R3" %in% colnames(outfiles)){
           file_names$R3 <- outfiles$R3
@@ -574,7 +574,7 @@ demultiplex <- function(R1, R2 = NULL, R3 = NULL,
       }
     }
   }
-  
+
   return(file_names)
 }
 

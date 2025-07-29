@@ -32,7 +32,7 @@ if either the \code{read_start} or \code{header} \code{barcode_location}
 options are selected.}
 
 \item{indices}{character. Vector of \emph{R2, seperate read} barcodes or file
-path to file containing such with one barcode on each line. Needed if 
+path to file containing such with one barcode on each line. Needed if
 the \code{R2} \code{barcode_location} option is selected.}
 
 \item{barcode_locations}{character. String indicating the locations of
