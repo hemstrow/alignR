@@ -9,6 +9,7 @@ align_reference(
   RB_fastqs = NULL,
   reference,
   mapQ = 5,
+  read_metadata = NULL,
   remove_duplicates = TRUE,
   remove_improper_pairs = TRUE,
   par = 1
@@ -36,6 +37,9 @@ paired reads reads will be removed using \code{samtools view -f 0x2}. Only
 valid for paired-end reads.}
 
 \item{par}{numeric, default 1. Number of cores to use for the alignments.}
+
+\item{platform}{character, default "ILLUMINA". The sequencing platform used,
+for adding read-group information.}
 }
 \value{
 Generates 'x.sort.flt.bam' and 'x.sort.flt.bam.bai' files (sorted

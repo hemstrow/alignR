@@ -10,23 +10,9 @@
 \alias{genotype_bams_GATK}
 \title{Genotype bamfiles with GATK}
 \usage{
-run_HaplotypeCaller(
-  bamfiles,
-  reference,
-  mem,
-  par = 1,
-  java_path = "java",
-  gatk4_path = "gatk.jar"
-)
+run_HaplotypeCaller(bamfiles, reference, mem, region = "all", par = 1)
 
-add_RGS(
-  bamfiles,
-  fastqs,
-  par = 1,
-  platform = "ILLUMINA",
-  java_path = "java",
-  picard_path = "picard.jar"
-)
+add_RGS(bamfiles, read_metadata, fastqs = NULL, par = 1)
 
 run_GenomicsDBImport(
   hapmap,
@@ -68,6 +54,7 @@ prep_genome_GATK(reference, java_path = "java", picard_path = "picard.jar")
 genotype_bams_GATK(
   bamfiles,
   reference,
+  read_metadata = NULL,
   fastqs = NULL,
   par = 1,
   min_chr_size = 0,
@@ -79,7 +66,6 @@ genotype_bams_GATK(
   MQRankSum = -12.5,
   ReadPosRankSum = -8,
   min_genotype_quality = 13,
-  platform = "ILLUMINA",
   batch_size = 5,
   add_RGs = TRUE,
   java_path = "java",
@@ -100,22 +86,23 @@ automatically, if not, consider running \code{prep_genome_GATK}.}
 
 \item{par}{Numeric, default 1. Number of cores to use for parallel processing.}
 
-\item{java_path}{Character, default "java". Path to java install, by default
-expects java on system path.}
-
-\item{gatk4_path}{Character, default "gatk.jar". Path to gatk4 ".jar" file.
-Used over a GATK direct system path install to allow for manual memory
-allocation.}
+\item{read_metadata}{a data.frame or equivalent with a row for each entry in
+\code{bamfiles} read file and a columns, in order, indicating \itemize{
+\item{library}
+\item{sampleID/name}
+\item{sequencing platform}
+\item{flowcell}
+\item{sequencing lane}}
+Column names are optional but recommended for organizational purposes.
+The 'flowcell' and 'sequencing lane' columns can be left as NA,
+in which case they will be guessed from the fastq header. This may create
+errors if fastq headers are non-standard (flow cell and lane are expected
+in the third and fourth slots, respectively (separated by ':')). Ignored
+if \code{add_RGs} is \code{FALSE}.}
 
 \item{fastqs}{Character, paths to fastq files in the same order as bamfiles
 (if required); for \code{add_RGs}. Not required if \code{add_RGs} is
 \code{FALSE}.}
-
-\item{platform}{Character, default "ILLUMINA". The platform to mark for
-read-groups, ignored if \code{add_RGs} is \code{FALSE} for
-\code{genotype_bams_GATK}.}
-
-\item{picard_path}{Character, default "gatk.jar". Path to picard ".jar" file.}
 
 \item{batch_size}{Numeric, default 5. The number of "gvcf" files to import at
 a time during \code{GenomicsDBImport} operation. Higher numbers are faster

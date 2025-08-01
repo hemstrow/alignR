@@ -5,10 +5,10 @@ alignR:::.rule_caller_w_slurm(function(ref) {
   system(cmd)
   cmd <- paste0("samtools faidx ", ref)
   system(cmd)
-
-  # length
-  l <- data.table::fread(paste0(ref, ".fai"), select = 2)
-  l <- sum(l[[1]])
-  writeLines(as.character(l), paste0(ref, ".len"))
+  ref_bn <- gsub("\\.gz$", "", ref)
+  ref_bn <- rmake::replaceSuffix(ref_bn, "")
+  cmd <- paste0("picard CreateSequenceDictionary R= ", ref, " ",
+                "O= ", paste0(ref_bn, ".dict"))
+  system(cmd)
 },
 list(ref = params$.depends[1]), "genome_index")

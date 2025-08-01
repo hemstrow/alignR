@@ -143,8 +143,8 @@
   }
 
   # try fastp
-  ngsParalog_check <- suppressWarnings(system("fastp", ignore.stdout = TRUE, ignore.stderr = TRUE))
-  if(ngsParalog_check == 127){
+  fastp_check <- suppressWarnings(system("fastp", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(fastp_check == 127){
     Sys.setenv(fastp_install = FALSE)
     packageStartupMessage(paste0("No fastp installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("fastp")), collapse = "\n\t"),
@@ -153,5 +153,43 @@
   else{
     packageStartupMessage("fastp is good-to-go!\n")
     Sys.setenv(fastp_install = TRUE)
+  }
+
+  # try picard
+  picard_check <- suppressWarnings(system("picard", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(picard_check == 127){
+    Sys.setenv(picard_install = FALSE)
+    packageStartupMessage(paste0("No picard installation detected! Some functions will fail:\n\t",
+                                 paste0(unlist(.dependency_function_match("picard")), collapse = "\n\t"),
+                                 "\n"))
+  }
+  else{
+    packageStartupMessage("picard is good-to-go!\n")
+    Sys.setenv(picard_install = TRUE)
+  }
+
+  # try gatk4
+  gatk4_check <- suppressWarnings(system("gatk --version", ignore.stdout = TRUE, ignore.stderr = TRUE))
+  if(gatk4_check == 127){
+    Sys.setenv(fastp_install = FALSE)
+    packageStartupMessage(paste0("No gatk4 installation detected! Some functions will fail:\n\t",
+                                 paste0(unlist(.dependency_function_match("gatk")), collapse = "\n\t"),
+                                 "\n"))
+  }
+  else{
+    gatk4_check <- suppressWarnings(system("gatk --version", intern = TRUE, ignore.stderr = TRUE))
+    version <- gatk4_check[grep("GATK", gatk4_check)]
+    version <- gsub(".+v", "", version)
+    version <- as.numeric_version(version)
+    if(version >= as.numeric_version("4.0.0.0")){
+      packageStartupMessage("gatk4 is good-to-go!\n")
+      Sys.setenv(gatk4_install = TRUE)
+    }
+    else{
+      Sys.setenv(fastp_install = FALSE)
+      packageStartupMessage(paste0("gatk installation detected, but older than 4.0.0.0! Some functions will fail:\n\t",
+                                   paste0(unlist(.dependency_function_match("gatk")), collapse = "\n\t"),
+                                   "\n"))
+    }
   }
 }

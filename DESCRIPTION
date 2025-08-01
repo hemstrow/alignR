@@ -27,6 +27,7 @@ Imports:
     stats,
     utils
 Depends:
+    data.table,
     foreach,
     R (>= 3.6.0)
 Suggests: 

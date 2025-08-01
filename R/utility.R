@@ -1,3 +1,6 @@
+#'@import data.table
+NULL
+
 #' Equalize the number of reads across multiple fastq or fastq files.
 #'
 #' Subset out the first n reads of every fastq/fastq file, where n is either the
@@ -133,7 +136,7 @@ downsample_bams <- function(bams, reference, low_cut = 0, high_cut = Inf, tabula
 
   #=======prep============
   # get stats if needed
-  need_stats <- which(!file.exists(paste0(bams, ".stats")))
+  needed_stats <- which(!file.exists(paste0(bams, ".stats")))
   if(length(needed_stats) > 0){
     for(i in 1:length(needed_stats)){
       cmd <- paste0("samtools stats ", bams[i], " > ", bams[i], ".stats")
@@ -146,9 +149,10 @@ downsample_bams <- function(bams, reference, low_cut = 0, high_cut = Inf, tabula
     if(!file.exists(paste0(reference, ".fai"))){
       cmd <- paste0("samtools faidx ", reference)
       system(cmd)
-      reference <- data.table::fread(paste0(reference, ".fai"), select = 2)
-      reference <- sum(reference[[1]])
     }
+
+    reference <- data.table::fread(paste0(reference, ".fai"), select = 2)
+    reference <- sum(reference[[1]])
   }
 
 
@@ -288,16 +292,20 @@ merge_fastqs <- function(file_list, names = NULL, par = 1){
 #' the \code{sort_bamfiles} utility function.
 #'
 #' @param file_list list where each element contains a set of bam files to
-#'   merge. Each bam file must be sorted, see details.
+#'   merge. Each bam file must be sorted, see details. If a named list, output
+#'   file names will be the names of the list elements. Names should have no
+#'   extension. Names provided in \code{names} will supersede named list
+#'   elements.
 #' @param names character vector, default NULL. A vector of names for each
-#'   merged output file. If not provided, files will be named "merged_x", where
-#'   x is the name of the first file in each set to merge.
+#'   merged output file. If not provided and file names are not given in named
+#'   \code{file_list}, files will be named "merged_x", where x is the name of
+#'   the first file in each set to merge. Names should have no extension.
 #' @param par numeric, default 1. Number of cores to use for the merges.
 #'
 #' @export
 #' @author William Hemstrom
-#' @return Generates merged bam files. File paths provided as a character
-#'   vector returned from this function.
+#' @return Generates merged bam files. File paths provided as a character vector
+#'   returned from this function.
 merge_bams <- function(file_list, names = NULL, par = 1){
   #==========sanity checks=============
   msg <- character()
@@ -312,6 +320,21 @@ merge_bams <- function(file_list, names = NULL, par = 1){
       msg <- c(msg, "The provided names must be a character vector.\n")
     }
   }
+  else{
+    if(!is.null(names(file_list))){
+      if(all(names(file_test) != "")){
+        if(length(unique(names(file_list))) == length(file_list)){
+          names <- names(file_list)
+        }
+        else{
+          msg <- c(msg, "If file_list is a named list, each name must be unique and end in '.bam'.\n")
+        }
+      }
+      else{
+        msg <- c(msg, "If file_list is a named list, each name must be unique and end in '.bam'.\n")
+      }
+    }
+  }
 
   if(any(!tools::file_ext(unlist(file_list)) %in% c("bam"))){
     msg <- c(msg, "Only bam files accepted.\n")
@@ -322,9 +345,15 @@ merge_bams <- function(file_list, names = NULL, par = 1){
     msg <- c(msg, paste0("Some files not located:\n\t", paste0(unlist(file_list)[bad.files], collapse = "\n\t"), "\n"))
   }
 
+  if(!.check_system_install("samtools")){
+    msg <- c(msg, "No samtools install located on system path.\n")
+  }
+
   if(length(msg) > 0){
     stop(msg)
   }
+
+
   #==========sanity checks=============
 
   # prep
@@ -347,7 +376,9 @@ merge_bams <- function(file_list, names = NULL, par = 1){
       outfile <- file.path(dir, paste0(names[q], ".bam"))
     }
 
-    system(paste0("samtools merge -o ", outfile, " ", paste0(file_list[[q]], collapse = " ")))
+    system(paste0("samtools merge -f -o ", outfile, " ", paste0(file_list[[q]], collapse = " ")))
+
+    system(paste0("samtools index ",  outfile))
 
     outfile
   }
@@ -407,3 +438,223 @@ sort_bams <- function(bams, par = 1){
 
   return(unlist(output))
 }
+
+#' Create scatter groups for \code{\link{run_rmake_pipeline}}.
+#'
+#' Generates scatter metadata for \code{\link{run_rmake_pipeline}} for use
+#' in heavily parallel genotyping. Scaffolds are grouped by length, chromosomes
+#' are split into chunks.
+#'
+#' @param reference character. Path to reference genome.
+#' @param chr_size_cuttoff numeric. Chromosomes/scaffolds above this size
+#'   are considered as "chromosomes" for the purposes of scattering.
+#' @param max_chunk_size numeric. The maximum size of any one genomic chunk
+#'   analyzed.
+#'
+#' @author Eric Anderson
+#' @author William Hemstrom
+#' @export
+prep_scatter_intervals <- function(reference,
+                                   chr_size_cutoff,
+                                   max_chunk_size){
+  #=====================sanity checks and prep===========
+  .check_system_install("samtools")
+
+
+  if(!file.exists(paste0(reference, ".fai"))){
+    system(paste0("samtools faidx ", reference))
+  }
+
+  reference <- paste0(reference, ".fai")
+
+
+  #=====================my handler/prep code=============
+
+  # prepare the chromosome and scaffold groups
+  ## read and prepare chromosome info
+  chr_size <- chr_size_cutoff
+  genome_fai <- fread(reference,  header = FALSE, col.names = c("chrom", "num_bases", "x1", "x2", "x3"))
+  genome_fai[,cumlen := cumsum(num_bases)]
+
+  chroms <- genome_fai[num_bases >= chr_size_cutoff,]
+
+  ## prepare scaffolds file
+  chunk_size <- chr_size_cutoff
+  scaff_group <- function(x, csize){
+
+    # scaff <- x[num_bases < chr_size & num_bases >= min_size,]
+    scaff <- x[num_bases < csize,]
+    tbin <- 0
+    prog <- 0
+    if(nrow(scaff) == 0){
+      return(NULL)
+    }
+    for(i in 1:nrow(scaff)){
+      prog <- prog + scaff[i,num_bases]
+      out_of_bin <- floor(prog/csize)
+      if(out_of_bin > 0){
+        tbin <- tbin + 1
+        prog <- scaff[i,num_bases]
+      }
+      scaff[i,bin := tbin]
+    }
+    scaff[,scaff_cumlen := cumsum(num_bases), by = bin]
+    scaff[,bin := bin + 1]
+
+    hist(table(scaff$bin))
+    cat("Nbins:", length(unique(scaff$bin)), "\t", "Max len:", max(scaff$scaff_cumlen), "\nMax scaffs per bin:", max(table(scaff$bin)), "\n" )
+    gaps <- !1:max(scaff$bin) %in% unique(scaff$bin)
+    print(unique(scaff$bin))
+    if(any(gaps)){stop("Some scaffolds are too big to fit in chunks!\nBad chunks:", paste0((1:max(scaff$bin))[gaps], collaspe = ","))}
+
+    return(scaff)
+  }
+
+  scaffs <- scaff_group(genome_fai, chunk_size)
+  if(!is.null(scaffs)){
+    scaffs[,cumul := cumsum(num_bases)]
+    scaffs[,id := sprintf("scaff_group_%03d", bin)]
+    scaffs[,len := num_bases]
+    scaffs <- scaffs[,c("id", "chrom", "len", "cumul")]
+  }
+
+  #============Eric's scatter code==========
+  # only do the following if the chromosomes.tsv file is more than just the header
+  if(nrow(chroms) > 0) {
+    chroms <- chroms |>
+      dplyr::mutate(id = chrom, .before = chrom) |>
+      dplyr::group_by(id) |>
+      dplyr::mutate(cumul = cumsum(num_bases)) |>
+      dplyr::ungroup()
+
+
+
+
+    # Now, we handle the chromosomes and the scaffold groups a little
+    # differently.  (It's a shame really, they should just all be scaff_groups,
+    # with the chromosomes just being scaff groups of size 1.  Sigh...)
+
+    # for the chromos, we just find a good length to chop them up into.
+    # Here is a function that tries to get them all close to an equal length
+    # that is less than max_chunk_size:
+    #' @param L length of the chromosome
+    #' @param m max length of chunk
+    #' @param S the starting value
+    #' @return returns a tibble with start and stop columns of the different
+    #' chunks. (base-1 indexed, inclusive).
+    chromo_chopper = function(L, m, S = 1) {
+      # The number of bins will be:
+      B = ceiling(L / m)
+
+      # if m divides L perfectly, mstar is m and last_one = mstar
+      if((L %% m) == 0) {
+        mstar = m
+        last_one = mstar
+      } else {  # otherwise
+        mstar = ceiling(L / B)
+        last_one = L - mstar * (B - 1)
+      }
+
+      starts <- seq(S, S + B * (mstar - 1), by = mstar)
+      ends <- starts + mstar - 1
+      ends[length(ends)] <- starts[length(ends)] + last_one - 1
+
+      dplyr::tibble(
+        start = starts,
+        end = ends
+      ) |>
+        dplyr::mutate(scatter_length = end - start + 1) |>
+        dplyr::mutate(scatter_idx = sprintf("scat_%04d", 1:dplyr::n()), .before = start)
+    }
+
+
+    chroms2 <- chroms |>
+      dplyr::group_by(id) |>
+      dplyr::mutate(scats = purrr::map(num_bases, chromo_chopper, m = max_chunk_size)) |>
+      tidyr::unnest(scats) |>
+      dplyr::select(id, scatter_idx, chrom, start, end, scatter_length)
+  }
+
+
+
+  # Only to the following if the scaff_groups file is more than just the header.
+  if(!is.null(scaffs)) {
+
+    scaffs <- scaffs  |>
+      dplyr::rename(num_bases = len)
+
+    # now, for the scaffold groups we will do it a little differently.
+    # Any scaffold that is greater than the max_chunk_size will get broken down into
+    # roughly equal-sized chunks that are all less than the max_chunk_size.
+    scaff_chopper <- function(L, m) {
+      if(L <= m) return(
+        dplyr::tibble(
+          start = 1,
+          end = L,
+          seg_length = L
+        )
+      )
+      else {
+        return(
+          chromo_chopper(L, m) |>
+            dplyr::rename(seg_length = scatter_length) |>
+            dplyr::select(-scatter_idx)
+        )
+      }
+    }
+
+    scaffs2 <- scaffs |>
+      dplyr::ungroup() |>
+      dplyr::mutate(chops = purrr::map(num_bases, scaff_chopper, m = max_chunk_size)) |>
+      tidyr::unnest(chops) |>
+      dplyr::group_by(id) |>
+      dplyr::mutate(cumul = cumsum(seg_length))
+
+
+    # now we will group by id and within each one, just iterate through
+    # the number of bases and assign to different scat groups.
+    #' @param s the number of bases in each segment (i.e. the seg_length)
+    #' @param m the desired max chunk size
+    iteratively_assign_scats <- function(n, m) {
+      c <- 0  # cumulative in scat group
+      scg <- 1
+      ret <- character(length(n))
+      for(i in 1:length(n)) {
+        c <- c + n[i]
+        if(c > m) {
+          scg <- scg + 1
+          c <- n[i]
+        }
+        ret[i] <- sprintf("scat_%04d", scg)
+      }
+      ret
+    }
+
+    scaffs3 <- scaffs2 |>
+      dplyr::group_by(id) |>
+      dplyr::mutate(scatter_idx = iteratively_assign_scats(n = seg_length, m = max_chunk_size)) |>
+      dplyr::group_by(id, scatter_idx) |>
+      dplyr::mutate(scatter_length = sum(seg_length)) |>
+      dplyr::ungroup() |>
+      dplyr::select(id, scatter_idx, chrom, start, end, scatter_length)
+  }
+  else{
+    scaffs <- data.table::data.table()
+  }
+
+
+  if(nrow(scaffs) > 0 && nrow(chroms) > 0) {
+    chrom_and_sg <- data.table::rbindlist(list(chrom = chroms2, scaf = scaffs3), idcol = "type")
+  } else if(nrow(chroms) > 0) {
+    chrom_and_sg <- chroms2
+    chrom_and_sg$type <- "chrom"
+  } else if(nrow(scaffs) > 0) {
+    chrom_and_sg <- scaffs3
+    chrom_and_sg$type - "scaf"
+  } else {
+    stop("Error. At least one of chromosomes or scaffold_groups must have entries.")
+  }
+
+  return(chrom_and_sg)
+}
+

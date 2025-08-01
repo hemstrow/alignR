@@ -356,6 +356,7 @@
                   samtools = c("align_reference", "align_denovo", "genotype_bams via ANGSD"),
                   bwa = c("align_reference", "align_denovo with re_align = TRUE"),
                   gatk = c("genotype_bams via gatk"),
+                  picard = c("align_reference", "add_RGs"),
                   fastp = "trim_fastp")
 
   return(dep_tab[names(dep_tab) %in% dependancies])

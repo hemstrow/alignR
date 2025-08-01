@@ -4,11 +4,30 @@ bamfile=$1
 reference=$2
 tmp_dir=$3
 mem=$4
-javapath=$5
-gatkpath=$6
+region=$5
 
-$javapath -jar -Xmx${mem}g -Xms${mem}g -Djava.io.tmpdir=${tmp_dir} $gatkpath HaplotypeCaller \
+
+if [[ "$region" != "all" && "$region" != "" ]]; then
+  if [[ -f "$region" ]]; then
+    rprint=$(basename "$region" .list)
+    rprint=$(basename "$rprint" .bed)
+  else
+    rprint="$region"
+  fi
+
+  gatk --java-options "-Xmx${mem}g -Xms${mem}g -Djava.io.tmpdir=${tmp_dir}" HaplotypeCaller \
         -ERC GVCF \
         -R $reference \
         -I $bamfile \
-        -O ${bamfile}.hapcalls.gvcf.gz
+        -O ${bamfile}-${rprint}.hapcalls.gvcf.gz \
+        -L $region
+
+else
+  gatk --java-options "-Xmx${mem}g -Xms${mem}g -Djava.io.tmpdir=${tmp_dir}" HaplotypeCaller \
+          -ERC GVCF \
+          -R $reference \
+          -I $bamfile \
+          -O ${bamfile}-all.hapcalls.gvcf.gz
+fi
+
+

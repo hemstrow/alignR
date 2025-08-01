@@ -4,21 +4,25 @@
 \alias{merge_bams}
 \title{Merge bam files}
 \usage{
-merge_bams(file_list, names = NULL, par = 1)
+merge_bams(file_list, names = NULL, par = 1, overwrite_RGSM = TRUE)
 }
 \arguments{
 \item{file_list}{list where each element contains a set of bam files to
-merge. Each bam file must be sorted, see details.}
+merge. Each bam file must be sorted, see details. If a named list, output
+file names will be the names of the list elements. Names should have no
+extension. Names provided in \code{names} will supersede named list
+elements.}
 
 \item{names}{character vector, default NULL. A vector of names for each
-merged output file. If not provided, files will be named "merged_x", where
-x is the name of the first file in each set to merge.}
+merged output file. If not provided and file names are not given in named
+\code{file_list}, files will be named "merged_x", where x is the name of
+the first file in each set to merge. Names should have no extension.}
 
 \item{par}{numeric, default 1. Number of cores to use for the merges.}
 }
 \value{
-Generates merged bam files. File paths provided as a character
-  vector returned from this function.
+Generates merged bam files. File paths provided as a character vector
+  returned from this function.
 }
 \description{
 Merges bam files as a set from each element of a list using samtools.

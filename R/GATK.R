@@ -1,7 +1,9 @@
 #' @describeIn genotype_bams_GATK Build ".gvcf" haplotype files for each sample
 #'   with \code{GATK}'s \code{HaplotypeCaller}.
 #' @export
-run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "java", gatk4_path = "gatk.jar"){
+run_HaplotypeCaller <- function(bamfiles, reference, mem,
+                                region = "all",
+                                par = 1){
   #==========sanity checks=========
   msg <- character()
   bamfiles <- normalizePath(bamfiles)
@@ -36,6 +38,10 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
                          ".\n"))
   }
 
+  if(!.check_system_install("gatk4")){
+    stop("No gatk4 install located on system path.\n")
+  }
+
   if(length(msg) > 0){
     stop(msg)
   }
@@ -44,7 +50,6 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
   script <- .fetch_a_script("run_HaplotypeCaller.sh", "shell")
 
   temp_dir <- tempdir()
-
 
   # register parallel architecture
   cl <- parallel::makePSOCKcluster(par)
@@ -60,6 +65,7 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
                              .packages = "alignR"
   ) %dopar% {
     valid <- data.frame(bam = chunks[[q]], valid = character(length(chunks[[q]])), msg = character(length(chunks[[q]])))
+    valid$ofile <- ""
     for(i in 1:length(chunks[[q]])){
       # run Haplotype Caller
 
@@ -69,23 +75,39 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
                     chunks[[q]][i], " ",
                     reference, " ",
                     ttempdir, " ",
-                    mem, " ",
-                    java_path, " ",
-                    gatk4_path, " ")
+                    mem, " ")
+
+      # add a region arg if provided
+      if(region != "all"){
+        cmd <- paste0(cmd, region, " ")
+      }
 
       system(cmd, intern = TRUE)
       unlink(ttempdir, recursive = TRUE)
 
+      if(file.exists(region)){
+        ofile <- normalizePath(paste0(chunks[[q]][i], "-", tools::file_path_sans_ext(basename(region)), ".hapcalls.gvcf.gz"))
+      }
+      else{
+        ofile <- normalizePath(paste0(chunks[[q]][i], "-", region, ".hapcalls.gvcf.gz"))
+      }
+
+
       # validate
-      cmd <- paste0(java_path, " -jar ", gatk4_path, " ValidateVariants ",
+      cmd <- paste0("gatk ValidateVariants ",
                    "-R ", reference, " ",
                    "-gvcf TRUE ",
                    "--verbosity ERROR ",
-                   "-V ", paste0(chunks[[q]][i], ".hapcalls.gvcf.gz"),
-                   " 2>&1")
+                   "-V ", ofile, " ")
+
+      if(region != "all"){
+        cmd <- paste0(cmd, "-L ", region, " ")
+      }
+      cmd <- paste0(cmd, "2>&1")
 
       valid[i,3] <- paste0(system(cmd, intern = TRUE), collapse = "\n")
-      valid$valid[i] <- !grepl("ERR", valid[i,3])
+      valid[i,4] <- ofile
+      valid$valid[i] <- !grepl("ERROR has", valid[i,3])
     }
 
     valid
@@ -99,26 +121,29 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem, par = 1, java_path = "
   valid[,2] <- as.logical(valid[,2])
 
   if(any(!valid[,2])){
+    invalid_vcfs <- unlist(valid[isFALSE(valid),]$ofile)
     warning(paste0("Some HaplotypeCaller runs produced invalid vcf outputs. This can occur for a few reasons, but too small memory limits are a common cause. Invalid outputs:",
-                   paste0(valid[!valid[,2],1], sep = "\n\t"),
+                   paste0(invalid_vcfs, sep = "\n\t"),
                    "\nMessages for bad runs dumped to: ./ValidateVariants.err"))
-    writeLines(valid[!valid[,2], 3], "./ValidateVariants.err", sep = "\n\n===========================================================\n\n")
+    writeLines(valid[isFALSE(valid),]$msg, paste0("./ValidateVariants.err"),
+               sep = "\n\n===========================================================\n\n")
   }
 
 
   # save a hapmap
-  sample_map <- data.frame(samp = basename(tools::file_path_sans_ext(bamfiles)), file = normalizePath(paste0(bamfiles, ".hapcalls.gvcf.gz")))
-  data.table::fwrite(sample_map, paste0(bamfiles[1], "_hapmap.txt"), sep = "\t", col.names = F, row.names = F)
-  cat("hapmap saved to: ", paste0(bamfiles[1], "_hapmap.txt"), "\n")
+  sample_map <- data.frame(samp = basename(tools::file_path_sans_ext(valid$bam)), file = valid$ofile)
+  data.table::fwrite(sample_map, paste0(bamfiles[1], "-", tools::file_path_sans_ext(basename(region)), "_hapmap.txt"),
+                     sep = "\t", col.names = F, row.names = F)
+  cat("hapmap saved to: ", paste0(bamfiles[1], "-", tools::file_path_sans_ext(basename(region)), "_hapmap.txt"), "\n")
 
   # return info
-  return(paste0(bamfiles[1], "_hapmap.txt"))
+  return(paste0(bamfiles[1], "-", tools::file_path_sans_ext(basename(region)), "_hapmap.txt"))
 }
 
 #' @describeIn genotype_bams_GATK Add read groups to bam files with
 #'   \code{picard}.
 #' @export
-add_RGS <- function(bamfiles, fastqs, par = 1, platform = "ILLUMINA", java_path = "java", picard_path = "picard.jar"){
+add_RGS <- function(bamfiles, read_metadata, fastqs = NULL, par = 1){
   #==========sanity checks=========
   msg <- character()
   bamfiles <- normalizePath(bamfiles)
@@ -154,10 +179,21 @@ add_RGS <- function(bamfiles, fastqs, par = 1, platform = "ILLUMINA", java_path 
   }
 
   # check that the fastqs all exist
-  fastqs <- normalizePath(fastqs)
-  bad_fastqs <- which(!file.exists(fastqs))
-  if(length(bad_fastqs) != 0){
-    msg <- c(msg, paste0("Cannot locate fastqs: ", paste0(bad_fastqs, collapse = ", "), "\n"))
+  if(any(is.na(read_metadata[,4])) |
+     any(is.na(read_metadata[,5]))){
+    fastqs <- normalizePath(fastqs)
+    bad_fastqs <- which(!file.exists(fastqs))
+    if(length(bad_fastqs) != 0){
+      msg <- c(msg, paste0("Cannot locate fastqs: ", paste0(bad_fastqs, collapse = ", "), "\n"))
+    }
+    else{
+      # read in the metadata from the fastqs
+      for(i in 1:length(fastqs)){
+        tfh <- data.table::fread(fastqs[i], nrows = 1, header = FALSE, sep = ":")
+        read_metadata[i,4] <- tfh[3]
+        read_metadata[i,5] <- tfh[4]
+      }
+    }
   }
 
   if(length(msg) > 0){
@@ -170,7 +206,7 @@ add_RGS <- function(bamfiles, fastqs, par = 1, platform = "ILLUMINA", java_path 
   iters <- length(bamfiles)
   it_par <- (1:iters)%%par
   chunks <- split(bamfiles, it_par)
-  chunks_f <- split(fastqs, it_par)
+  chunks_f <- split(read_metadata, it_par)
 
   # register parallel architecture
   cl <- parallel::makePSOCKcluster(par)
@@ -181,14 +217,14 @@ add_RGS <- function(bamfiles, fastqs, par = 1, platform = "ILLUMINA", java_path 
                              .packages = "alignR"
   ) %dopar% {
     for(i in 1:length(chunks[[q]])){
+
       cmd <- paste0("bash ", script, " ",
                     chunks[[q]][i], " ",
-                    chunks_f[[q]][i], " ",
-                    basename(tools::file_path_sans_ext(chunks[[q]][i])), " ",
-                    java_path, " ",
-                    picard_path, " ",
-                    platform)
-
+                    chunks_f[[q]][i,3], " ", # platform
+                    chunks_f[[q]][i,1], " ", # library
+                    chunks_f[[q]][i,2], " ", # sampleID
+                    chunks_f[[q]][i,4], " ", # flowcell
+                    chunks_f[[q]][i,5], " ") # lane
       system(cmd)
     }
   }
@@ -677,9 +713,6 @@ concat_vcfs <- function(vcfs, outfile = paste0(tools::file_path_sans_ext(vcfs[1]
 #'   quality score below which individual genotypes will be marked as missing.
 #'   The default corresponds to ~95% certainty of correct genotyping, which is
 #'   usually in the approximately 7x coverage range.
-#' @param platform Character, default "ILLUMINA". The platform to mark for
-#'   read-groups, ignored if \code{add_RGs} is \code{FALSE} for
-#'   \code{genotype_bams_GATK}.
 #' @param batch_size Numeric, default 5. The number of "gvcf" files to import at
 #'   a time during \code{GenomicsDBImport} operation. Higher numbers are faster
 #'   but more memory intense, for the most part.
@@ -687,21 +720,29 @@ concat_vcfs <- function(vcfs, outfile = paste0(tools::file_path_sans_ext(vcfs[1]
 #'   information will be added to bam files using the function \code{add_RGs}.
 #'   If more complicated read-group information is already present in bam files,
 #'   this should be set to \code{FALSE}.
-#' @param java_path Character, default "java". Path to java install, by default
-#'   expects java on system path.
-#' @param gatk4_path Character, default "gatk.jar". Path to gatk4 ".jar" file.
-#'   Used over a GATK direct system path install to allow for manual memory
-#'   allocation.
-#' @param picard_path Character, default "gatk.jar". Path to picard ".jar" file.
 #' @param concatenate_final_vcfs Character, default \code{TRUE}. If \code{TRUE},
 #'   the final "vcf" files produced by \code{GenotypeGVCFs} will be concatenated
 #'   automatically using \code{\link{concat_vcfs}}.
+#' @param read_metadata a data.frame or equivalent with a row for each entry in
+#'   \code{bamfiles} read file and a columns, in order, indicating \itemize{
+#'   \item{library}
+#'   \item{sampleID/name}
+#'   \item{sequencing platform}
+#'   \item{flowcell}
+#'   \item{sequencing lane}}
+#'   Column names are optional but recommended for organizational purposes.
+#'   The 'flowcell' and 'sequencing lane' columns can be left as NA,
+#'   in which case they will be guessed from the fastq header. This may create
+#'   errors if fastq headers are non-standard (flow cell and lane are expected
+#'   in the third and fourth slots, respectively (separated by ':')). Ignored
+#'   if \code{add_RGs} is \code{FALSE}.
 #'
 #' @export
 #' @author William Hemstrom
 #' @return A vector of final ".vcf"/".gvcf"/"_db"/".bam"/.etc file paths,
 #'   depending on the function function.
-genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_chr_size = 0, chunk_size = "chr",
+genotype_bams_GATK <- function(bamfiles, reference, read_metadata = NULL, fastqs = NULL,
+                               par = 1, min_chr_size = 0, chunk_size = "chr",
                                QD = 2,
                                FS = 60,
                                SOR = 3,
@@ -709,7 +750,6 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
                                MQRankSum = -12.5,
                                ReadPosRankSum = -8,
                                min_genotype_quality = 13,
-                               platform = "ILLUMINA",
                                batch_size = 5,
                                add_RGs = TRUE,
                                java_path = "java", gatk4_path = "gatk.jar", picard_path = "picard.jar",
@@ -750,10 +790,18 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
   }
 
   if(add_RGs){
-    fastqs <- normalizePath(fastqs)
-    bad_fastqs <- which(!file.exists(fastqs))
-    if(length(bad_bams) != 0){
-      msg <- c(msg, paste0("Cannot locate fastqs: ", paste0(bad_fastqs, collapse = ", "), "\n"))
+    if(is.null(read_metadata)){
+      msg <- c(msg, "read_metadata must be provided if adding RGs.\n")
+    }
+    else{
+      if(any(is.na(read_metadata[,4])) |
+         any(is.na(read_metadata[,5]))){
+        fastqs <- normalizePath(fastqs)
+        bad_fastqs <- which(!file.exists(fastqs))
+        if(length(bad_bams) != 0){
+          msg <- c(msg, paste0("Cannot locate fastqs: ", paste0(bad_fastqs, collapse = ", "), "\n"))
+        }
+      }
     }
   }
 
@@ -778,11 +826,9 @@ genotype_bams_GATK <- function(bamfiles, reference, fastqs = NULL, par = 1, min_
   # add RGs
   if(add_RGs){
     bamfiles <- add_RGS(bamfiles = bamfiles,
+                        read_metadata = read_metadata,
                         fastqs = fastqs,
-                        par = par,
-                        platform = platform,
-                        java_path = java_path, picard_path = picard_path,
-                        slurm_args_RGs = slurm_args_RGs)
+                        par = par)
   }
 
   bedfiles <- make_region_beds(reference, min_chr_size = min_chr_size, chunk_size, outdir = "./")

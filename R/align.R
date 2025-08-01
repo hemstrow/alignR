@@ -31,6 +31,8 @@
 #' @param remove_improper_pairs logical, default TRUE. If TRUE, improperly
 #'   paired reads reads will be removed using \code{samtools view -f 0x2}. Only
 #'   valid for paired-end reads.
+#' @param platform character, default "ILLUMINA". The sequencing platform used,
+#'   for adding read-group information.
 #' @param par numeric, default 1. Number of cores to use for the alignments.
 #'
 #' @return Generates 'x.sort.flt.bam' and 'x.sort.flt.bam.bai' files (sorted
@@ -40,6 +42,7 @@
 #' @author William Hemstrom
 #' @export
 align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
+                            read_metadata = NULL,
                             remove_duplicates = TRUE, remove_improper_pairs = TRUE,
                             par = 1){
   #=============sanity checks===================
@@ -82,6 +85,22 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   if(length(msg) > 0){
     stop(msg)
   }
+
+  if(!is.null(read_metadata)){
+    if(!.check_system_install("picard")){
+      msg <- c(msg, "No picard install located on system path.\n")
+    }
+    if(any(is.na(read_metadata[,4])) |
+       any(is.na(read_metadata[,5]))){
+      # read in the metadata from the fastqs
+      for(i in 1:length(RA_fastqs)){
+        tfh <- data.table::fread(RA_fastqs[i], nrows = 1, header = FALSE, sep = ":")
+        read_metadata[i,4] <- tfh[3]
+        read_metadata[i,5] <- tfh[4]
+      }
+    }
+  }
+
 
   #==============prepare to run=================
   reference <- normalizePath(reference)
@@ -129,6 +148,10 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
   iters <- length(RA_fastqs)
   it_par <- (1:iters)%%par
   chunks <- split(fastqs, it_par)
+  if(!is.null(read_metadata)){
+    chunks_f <- split(read_metadata, it_par)
+    rg_script <- .fetch_a_script("add_RGs.sh", "shell")
+  }
 
   # run
   output <- foreach::foreach(q = 1:par, .inorder = FALSE, .errorhandling = "pass",
@@ -143,9 +166,23 @@ align_reference <- function(RA_fastqs, RB_fastqs = NULL, reference, mapQ = 5,
                       chunks[[q]]$RB[i], " ", reference, " ",
                       mapQ, " ",
                       ifelse(remove_duplicates, 1, 0), " ",
-                      ifelse(remove_improper_pairs, 1, 0))
+                      ifelse(remove_improper_pairs, 1, 0), " ")
       }
       system(cmd)
+
+      # add RGs if requested
+      if(!is.null(chunks_f)){
+        cmd <- paste0("bash ", rg_script, " ",
+                      rmake::replaceSuffix(chunks[[q]]$RA[i], ".sort.flt.bam"), " ",
+                      chunks_f[[q]][i,3], " ", # platform
+                      chunks_f[[q]][i,1], " ", # library
+                      chunks_f[[q]][i,2], " ", # sampleID
+                      chunks_f[[q]][i,4], " ", # flowcell
+                      chunks_f[[q]][i,5], " ") # lane)
+        system(cmd)
+        file.rename(rmake::replaceSuffix(chunks[[q]]$RA[i], ".sort.flt.RG.bam"),
+                    rmake::replaceSuffix(chunks[[q]]$RA[i], ".sort.flt.bam"))
+      }
     }
   }
 
