@@ -324,7 +324,7 @@ make_region_beds <- function(reference, min_chr_size = 0, chunk_size = "chr", ou
 #' @describeIn genotype_bams_GATK Build genome databases using \code{GATK}'s
 #'   \code{GenomicsDBImport}.
 #' @export
-run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5, java_path = "java", gatk4_path = "gatk.jar"){
+run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5){
   #============sanity checks==================
   msg <- character()
 
@@ -385,8 +385,6 @@ run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5,
                     chunks[[q]][i], " ",
                     mem, " ",
                     ttempdir, " ",
-                    java_path, " ",
-                    gatk4_path, " ",
                     batch_size)
 
       system(cmd)
@@ -404,7 +402,7 @@ run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5,
 #' @describeIn genotype_bams_GATK Generate called genotypes from GenomeDBs using
 #'  \code{GATK}'s \code{GenotypeGVCFs}.
 #' @export
-run_GenotypeGVCFs <- function(bedfiles, reference, mem, par = 1, java_path = "java", gatk4_path = "gatk.jar"){
+run_GenotypeGVCFs <- function(bedfiles, reference, mem, par = 1){
   #============sanity checks==================
   msg <- character()
 
@@ -451,9 +449,7 @@ run_GenotypeGVCFs <- function(bedfiles, reference, mem, par = 1, java_path = "ja
                     chunks[[q]][i], " ",
                     reference, " ",
                     mem, " ",
-                    ttempdir, " ",
-                    java_path, " ",
-                    gatk4_path)
+                    ttempdir, " ")
 
       system(cmd)
       unlink(ttempdir, recursive = TRUE)

@@ -33,7 +33,10 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                  remove_improper_pairs = TRUE,
                                                  platform = "ILLUMINA"),
                                HaplotypeCaller_args = list(mem = 2),
-                               GenomicsDBImport_args = list(batch_size = 5),
+                               GenomicsDBImport_args = list(mem = 4,
+                                                            batch_size = 5),
+                               GenotypeGVCFs_args = list(mem = 4,
+                                                         max_alternate_alleles = 2),
                                VariantFiltration_args = list(QD = 2,
                                                              FS = 60,
                                                              SOR = 3,
@@ -230,7 +233,7 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   # basic idea is: scatter chromosomes and scaffold groups, run Haplotype caller for each interval, import into shared dbs for scaffold groups and chromosomes, then genotype for each interval
 
   #=======================GATK multistep==========================================
-  # Haplotype caller
+  # HaplotypeCaller
   browser()
   HC_script <- .fetch_a_script("HaplotypeCaller.R", "rmake")
 
@@ -238,7 +241,7 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                      "$[sg]-$[rf].hapcalls.gvcf.gz.tbi"),
                           script = HC_script,
                           depends = c("$[RA]", file.path(dirname(RA[1]), "$[rf].list"), "$[RA].bai",
-                                      paste0(reference, ".fai"),
+                                      reference,
                                       paste0(ref_bn, ".dict")),
                           params = .fill_args_defaults(c(list(reference = reference),
                                                          slurm_profile$HaplotypeCaller,
@@ -250,7 +253,84 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                             data.frame(rf = scatter_groups))
   HC_rule <- rmake::expandTemplate(HC_rule, vars = HC_fill_df)
 
-  rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule, downsample_rule, HC_rule), fileName = "Makefile", makeScript = "Makefile.R")
+  browser()
+
+  # CenomicsDBImport
+  # this runs on each scaffold group/chromosome.
+  GDBI_script <- .fetch_a_script("GenomicsDBImport.R", "rmake")
+  ## rule is a bit complicated, so made with for loop(s). Note also that this doesn't use the genomicsDBImport function in alignR because that uses hapmap files that we don't have.
+  GDBI_rule <- vector("list", 0)
+  gdbis <- character()
+  if(any(scatter_info$type == "chrom")){
+    uchroms <- unique(scatter_info[type == "chrom",]$chrom)
+    for(i in 1:length(uchroms)){
+      tscats <- scatter_info[type == "chrom" & chrom == uchroms[i],]$scatter_idx
+      tdeps <- expand.grid(sample_names, tscats)
+      tdeps <- paste0(tdeps[[1]], "-", tdeps[[2]], ".hapcalls.gvcf.gz")
+      GDBI_rule[i] <- list(rmake::rRule(target = file.path(dirname(RA[1]), paste0(uchroms[i], "_db")),
+                                        script = GDBI_script,
+                                        depends = c(tdeps, paste0(tdeps, ".tbi"),
+                                                    reference,
+                                                    paste0(ref_bn, ".dict")),
+                                        params = c(list(reference = reference, L = uchroms[i]),
+                                                   slurm_profile$GenomicsDBImport,
+                                                   GenomicsDBImport_args)))
+      gdbis <- c(gdbis, rmake::targets(GDBI_rule[[i]]))
+    }
+  }
+  if(any(scatter_info$type == "scaf")){
+    sgs <- unique(scatter_info[type == "scaf",]$scatter_idx)
+    for(i in 1:length(sgs)){
+      tdeps <- expand.grid(sample_names, sgs[i])
+      tdeps <- paste0(tdeps[[1]], "-", tdeps[[2]], ".hapcalls.gvcf.gz")
+      GDBI_rule <- c(GDBI_rule, list(rmake::rRule(target = file.path(dirname(RA[1]), paste0(sgs[i], "_db")),
+                                                  script = GDBI_script,
+                                                  depends = c(tdeps, paste0(tdeps, ".tbi"),
+                                                              reference,
+                                                              paste0(ref_bn, ".dict")),
+                                                  params = c(list(reference = reference,
+                                                                  L = file.path(dirname(RA[1]),
+                                                                                paste0(scatter_groups, ".list"))),
+                                                             slurm_profile$GenomicsDBImport,
+                                                             GenomicsDBImport_args))))
+
+      gdbis <- c(gdbis, rmake::targets(GDBI_rule[[length(GDBI_rule)]]))
+    }
+  }
+
+  # GenotypeGVCFs
+  # as before this uses a slightly different syntax (no hapmaps) than the alignR wrapper function, so this gets it's own version.
+  genotype_script <- .fetch_a_script("GenotypeGVCFs.R", "rmake")
+  genotype_rule <- list()
+  browser()
+  if(any(scatter_info$type == "chrom")){
+    chrom_geno_rule <- rmake::rRule(target = file.path(dirname(RA[1]), "$[scatter_idx].vcf.gz"),
+                                    script = genotype_script,
+                                    depends = c(file.path(dirname(RA[1]), "$[scatter_idx].list"),
+                                                file.path(dirname(RA[1]), "$[chrom]_db"),
+                                                reference,
+                                                paste0(ref_bn, ".dict")),
+                                    params = c(slurm_profile$GenotypeGVCFs,
+                                               GenotypeGVCFs_args))
+
+    genotype_rule <- c(genotype_rule, rmake::expandTemplate(chrom_geno_rule, vars = as.data.frame(scatter_info[type == "chrom", .(scatter_idx, chrom)])))
+  }
+  if(any(scatter_info$type == "scaf")){
+    scat_geno_rule <- rmake::rRule(target = file.path(dirname(RA[1]), "$[scatter_idx].vcf.gz"),
+                                    script = genotype_script,
+                                    depends = c(file.path(dirname(RA[1]), "$[scatter_idx].list"),
+                                                file.path(dirname(RA[1]), "$[scatter_idx]_db"),
+                                                reference,
+                                                paste0(ref_bn, ".dict")),
+                                    params = c(slurm_profile$GenotypeGVCFs,
+                                               GenotypeGVCFs_args))
+
+    genotype_rule <- c(genotype_rule, rmake::expandTemplate(scat_geno_rule, vars = as.data.frame(scatter_info[type == "scaff",]$scatter_idx)))
+  }
+
+  rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule, downsample_rule,
+                    HC_rule, GDBI_rule, genotype_rule),
+                  fileName = "Makefile", makeScript = "Makefile.R")
   rmake::make()
 
 

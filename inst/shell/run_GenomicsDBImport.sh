@@ -4,14 +4,12 @@ samplemap=$1
 bedfile=$2
 mem=$3
 tmp_dir=$4
-javapath=$5
-gatkpath=$6
-batchsize=$7
+batchsize=$5
 
 bn=$(basename "$bedfile" .bed)
 dir=$(dirname "$bedfile")
 
-$javapath -jar -Xmx${mem}g -Xms${mem}g $gatkpath GenomicsDBImport \
+gatk --java-options "-Xmx${mem}g -Xms${mem}g" GenomicsDBImport \
        --genomicsdb-workspace-path ${dir}/${bn}_db \
        --batch-size $batchsize \
        -L $bedfile \
