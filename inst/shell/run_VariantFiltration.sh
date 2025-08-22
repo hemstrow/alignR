@@ -10,13 +10,13 @@ MQRS="${7}"
 RPRS="${8}"
 GQ="${9}"
 mem=${10}
-javapath=${11}
-gatkpath=${12}
 
-bn=$(basename "$vcf" .vcf)
+
+bn=$(basename "$vcf" .gz)
+bn=$(basename "$bn" .vcf)
 dir=$(dirname "$vcf")
 
-$javapath -jar -Xmx${mem}g -Xms${mem}g $gatkpath VariantFiltration \
+gatk --java-options "-Xmx${mem}g -Xms${mem}g" VariantFiltration \
        -R $ref \
        -V $vcf \
        --filter-name "QDf" \
@@ -37,7 +37,6 @@ bcftools view --types snps -m 2 -M 2 ${dir}/${bn}_hard_filt.vcf > ${dir}/${bn}_h
 
 vcftools --vcf ${dir}/${bn}_hard_filt_temp.vcf \
         --remove-filtered-all \
-        --remove-indels \
         --minGQ $GQ \
         --recode \
         --recode-INFO-all \

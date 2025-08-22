@@ -32,12 +32,16 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                  remove_duplicates = TRUE,
                                                  remove_improper_pairs = TRUE,
                                                  platform = "ILLUMINA"),
-                               HaplotypeCaller_args = list(mem = 2),
+                               HaplotypeCaller_args = list(mem = 2,
+                                                           min_base_quality_score = 33,
+                                                           minimum_mapping_quality = 20),
                                GenomicsDBImport_args = list(mem = 4,
                                                             batch_size = 5),
                                GenotypeGVCFs_args = list(mem = 4,
-                                                         max_alternate_alleles = 2),
-                               VariantFiltration_args = list(QD = 2,
+                                                         max_alternate_alleles = 2,
+                                                         new_qual = TRUE),
+                               VariantFiltration_args = list(mem = 2,
+                                                             QD = 2,
                                                              FS = 60,
                                                              SOR = 3,
                                                              MQ = 40,
@@ -50,8 +54,14 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                     merge = NULL,
                                                     downsample = NULL)){
 
-  # rmake needs to know where the script is that generates the makefile; so save a dummy copy of this funciton first
+  # rmake needs to know where the script is that generates the makefile; so save a dummy copy of this function alongside called args.
+  env <- c(as.list(environment()))
   sink("Makefile.R")
+  cat("# alignR run_rmake_pipeline call.\n#=====================================\n#Arguments:\n")
+  for(i in 1:length(env)){
+    cat(paste0("# ", names(env)[i], "\n#\t\t", paste0(unlist(env[[i]]), collapse = ", "), "\n"))
+  }
+  cat("# alignR run_rmake_pipeline call.\n#=====================================\n#Function:\n")
   print.function(run_rmake_pipeline)
   sink()
 
@@ -70,7 +80,24 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   sample_names <- rmake::replaceSuffix(RA, "")
   sample_namesB <- rmake::replaceSuffix(RB, "")
 
-
+  if(!.check_system_install("gatk4")){
+    stop("No gatk4 install located on system path.\n")
+  }
+  if(!.check_system_install("picard")){
+    stop("No picard install located on system path.\n")
+  }
+  if(!.check_system_install("samtools")){
+    stop("No SAMtools install located on system path.\n")
+  }
+  if(!.check_system_install("bcftools")){
+    stop("No bcftools install located on system path.\n")
+  }
+  if(!.check_system_install("bwa")){
+    stop("No bwa install located on system path.\n")
+  }
+  if(!.check_system_install("vcftools")){
+    stop("No vcftools install located on system path.\n")
+  }
 
   #=======================generate scatter info===================================
   # Computationally light, this is the only real "computation" step done prior to the actual snakemake. Specifically, this will
@@ -234,7 +261,6 @@ run_rmake_pipeline <- function(RA, RB = NULL,
 
   #=======================GATK multistep==========================================
   # HaplotypeCaller
-  browser()
   HC_script <- .fetch_a_script("HaplotypeCaller.R", "rmake")
 
   HC_rule <- rmake::rRule(target = c("$[sg]-$[rf].hapcalls.gvcf.gz",
@@ -252,8 +278,6 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   HC_fill_df <- merge(data.frame(sg = sample_names, RA = RA),
                             data.frame(rf = scatter_groups))
   HC_rule <- rmake::expandTemplate(HC_rule, vars = HC_fill_df)
-
-  browser()
 
   # CenomicsDBImport
   # this runs on each scaffold group/chromosome.
@@ -302,7 +326,6 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   # as before this uses a slightly different syntax (no hapmaps) than the alignR wrapper function, so this gets it's own version.
   genotype_script <- .fetch_a_script("GenotypeGVCFs.R", "rmake")
   genotype_rule <- list()
-  browser()
   if(any(scatter_info$type == "chrom")){
     chrom_geno_rule <- rmake::rRule(target = file.path(dirname(RA[1]), "$[scatter_idx].vcf.gz"),
                                     script = genotype_script,
@@ -328,13 +351,28 @@ run_rmake_pipeline <- function(RA, RB = NULL,
     genotype_rule <- c(genotype_rule, rmake::expandTemplate(scat_geno_rule, vars = as.data.frame(scatter_info[type == "scaff",]$scatter_idx)))
   }
 
+  # Variant Filtration
+  ## we can use the pre-existing function here, no problems
+  browser()
+  VF_script <- .fetch_a_script("VariantFiltration.R", "rmake")
+
+  VF_rule <- rmake::rRule(target = c("$[scat]_hard_filt_pass.recode.vcf"),
+                          script = VF_script,
+                          depends = c("$[scat].vcf.gz",
+                                      reference,
+                                      paste0(ref_bn, ".dict")),
+                          params = .fill_args_defaults(c(slurm_profile$VariantFiltration,
+                                                         VariantFiltration_args),
+                                                       func = run_VariantFiltration,
+                                                       skip = c("vcfs", "reference")))
+  VF_rule <- rmake::expandTemplate(VF_rule, vars = data.frame(scat = file.path(dirname(RA[1]), scatter_groups)))
+
+
+
   rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule, downsample_rule,
-                    HC_rule, GDBI_rule, genotype_rule),
+                    HC_rule, GDBI_rule, genotype_rule, VF_rule),
                   fileName = "Makefile", makeScript = "Makefile.R")
   rmake::make()
-
-
-
 }
 
 # fill in default args from a list of args for a function, optionally appending

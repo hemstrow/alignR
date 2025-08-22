@@ -3,6 +3,8 @@
 #' @export
 run_HaplotypeCaller <- function(bamfiles, reference, mem,
                                 region = "all",
+                                min_base_quality_score = 33,
+                                minimum_mapping_quality = 20,
                                 par = 1){
   #==========sanity checks=========
   msg <- character()
@@ -10,6 +12,10 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem,
   bad_bams <- which(!file.exists(bamfiles))
   if(length(bad_bams) != 0){
     msg <- c(msg, paste0("Cannot locate bamfiles: ", paste0(bad_bams, collapse = ", "), "\n"))
+  }
+
+  if(!.check_system_install("gatk4")){
+    stop("No gatk4 install located on system path.\n")
   }
 
   if(length(msg) > 0){
@@ -75,7 +81,9 @@ run_HaplotypeCaller <- function(bamfiles, reference, mem,
                     chunks[[q]][i], " ",
                     reference, " ",
                     ttempdir, " ",
-                    mem, " ")
+                    mem, " ",
+                    min_base_quality_score, " ",
+                    minimum_mapping_quality, " ")
 
       # add a region arg if provided
       if(region != "all"){
@@ -154,6 +162,10 @@ add_RGS <- function(bamfiles, read_metadata, fastqs = NULL, par = 1){
 
   if(length(msg) > 0){
     stop(msg)
+  }
+
+  if(!.check_system_install("picard")){
+    stop("No picard install located on system path.\n")
   }
 
   # check that the bams exist and are indexed.
@@ -327,6 +339,9 @@ make_region_beds <- function(reference, min_chr_size = 0, chunk_size = "chr", ou
 run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5){
   #============sanity checks==================
   msg <- character()
+  if(!.check_system_install("gatk4")){
+    stop("No gatk4 install located on system path.\n")
+  }
 
   bedfiles <- normalizePath(bedfiles)
   bad_beds <- which(!file.exists(bedfiles))
@@ -402,9 +417,12 @@ run_GenomicsDBImport <- function(hapmap, bedfiles, mem, par = 1, batch_size = 5)
 #' @describeIn genotype_bams_GATK Generate called genotypes from GenomeDBs using
 #'  \code{GATK}'s \code{GenotypeGVCFs}.
 #' @export
-run_GenotypeGVCFs <- function(bedfiles, reference, mem, par = 1){
+run_GenotypeGVCFs <- function(bedfiles, reference, mem, new_qual = TRUE, par = 1){
   #============sanity checks==================
   msg <- character()
+  if(!.check_system_install("gatk4")){
+    stop("No gatk4 install located on system path.\n")
+  }
 
   bedfiles <- normalizePath(bedfiles)
   bad_beds <- which(!file.exists(bedfiles))
@@ -449,6 +467,7 @@ run_GenotypeGVCFs <- function(bedfiles, reference, mem, par = 1){
                     chunks[[q]][i], " ",
                     reference, " ",
                     mem, " ",
+                    ifelse(new_qual, 1, 0), " ",
                     ttempdir, " ")
 
       system(cmd)
@@ -464,6 +483,7 @@ run_GenotypeGVCFs <- function(bedfiles, reference, mem, par = 1){
 
 #' @describeIn genotype_bams_GATK Filter called genotypes using \code{GATK}'s
 #'   \code{VariantFiltration}.
+#' @export
 run_VariantFiltration <- function(vcfs, reference, mem,
                                   par = 1,
                                   QD = 2,
@@ -472,10 +492,20 @@ run_VariantFiltration <- function(vcfs, reference, mem,
                                   MQ = 40,
                                   MQRankSum = -12.5,
                                   ReadPosRankSum = -8,
-                                  min_genotype_quality = 13,
-                                  java_path = "java", gatk4_path = "gatk.jar"){
+                                  min_genotype_quality = 13){
   #============sanity checks==================
   msg <- character()
+  if(!.check_system_install("gatk4")){
+    stop("No gatk4 install located on system path.\n")
+  }
+
+  if(!.check_system_install("bcftools")){
+    stop("No gatk4 install located on system path.\n")
+  }
+
+  if(!.check_system_install("vcftools")){
+    stop("No vcftools install located on system path.\n")
+  }
 
   vcfs <- normalizePath(vcfs)
   bad_vcfs <- which(!file.exists(vcfs))
@@ -515,9 +545,7 @@ run_VariantFiltration <- function(vcfs, reference, mem,
                     format(MQRankSum, nsmall = 1), " ",
                     format(ReadPosRankSum, nsmall = 1), " ",
                     min_genotype_quality, " ",
-                    mem, " ",
-                    java_path, " ",
-                    gatk4_path)
+                    mem, " ")
 
       system(cmd)
     }
@@ -532,9 +560,7 @@ run_VariantFiltration <- function(vcfs, reference, mem,
 #' @describeIn genotype_bams_GATK Prepare a reference genome for genotyping with
 #'   \code{picard} and other indexers.
 #' @export
-prep_genome_GATK <- function(reference,
-                             java_path = "java",
-                             picard_path = "picard.jar"){
+prep_genome_GATK <- function(reference){
 
   #======sanity checks=======
   msg <- character()
@@ -543,7 +569,11 @@ prep_genome_GATK <- function(reference,
     msg <- c(msg, "No SAMtools install located on system path.\n")
   }
   if(!.check_system_install("bwa")){
-    msg <- c(msg, "No SAMtools install located on system path.\n")
+    msg <- c(msg, "No bwa install located on system path.\n")
+  }
+
+  if(!.check_system_install("picard")){
+    msg <- c(msg, "No picard install located on system path.\n")
   }
 
   if(length(msg) != 0){
@@ -585,8 +615,7 @@ prep_genome_GATK <- function(reference,
 
   # index -- picard
   if(!file.exists(paste0(tools::file_path_sans_ext(reference, compression = TRUE), ".dict"))){
-    cmd <- paste0(java_path, " -jar ", picard_path,
-                  " CreateSequenceDictionary R= ", reference)
+    cmd <- paste0("picard CreateSequenceDictionary R= ", reference)
     system(cmd)
   }
 
@@ -677,6 +706,12 @@ concat_vcfs <- function(vcfs, outfile = paste0(tools::file_path_sans_ext(vcfs[1]
 #' @param chunk_size Numeric or "chr", default "chr". Size of chunks by which
 #'   to split up databases and genotyping, in base pairs. If "chr", chromosomes
 #'   will not be split.
+#' @param new_qual logical, default TRUE. If TRUE, uses GATK's new AF model. Set
+#'   FALSE if comparing with old genotyping runs which used the old model.
+#' @param min_base_quality_score numeric, default 33. Base quality score cutoff
+#'   for use during haplotype calling.
+#' @param minimum_mapping_quality Numeric, default 20. Mapping quality score
+#'   cutoff for use during haplotype calling.
 #' @param QD Numeric, default 2. Minimum quality-by-depth score to keep
 #'   variants. See
 #'   \href{https://gatk.broadinstitute.org/hc/en-us/articles/360035890471-Hard-filtering-germline-short-variants}{here}
@@ -746,15 +781,21 @@ genotype_bams_GATK <- function(bamfiles, reference, read_metadata = NULL, fastqs
                                MQRankSum = -12.5,
                                ReadPosRankSum = -8,
                                min_genotype_quality = 13,
+                               new_qual = TRUE,
+                               min_base_quality_score = 33,
+                               minimum_mapping_quality = 20,
                                batch_size = 5,
                                add_RGs = TRUE,
-                               java_path = "java", gatk4_path = "gatk.jar", picard_path = "picard.jar",
                                concatenate_final_vcfs = TRUE){
 
   #============sanity checks==================
   msg <- character()
   bamfiles <- normalizePath(bamfiles)
   bad_bams <- which(!file.exists(bamfiles))
+  if(!.check_system_install("gatk4")){
+    stop("No gatk4 install located on system path.\n")
+  }
+
   if(length(bad_bams) != 0){
     msg <- c(msg, paste0("Cannot locate bamfiles: ", paste0(bad_bams, collapse = ", "), "\n"))
   }
@@ -832,26 +873,25 @@ genotype_bams_GATK <- function(bamfiles, reference, read_metadata = NULL, fastqs
   #=========run pipeline=====
   hapmap <- run_HaplotypeCaller(bamfiles, reference,
                                 mem = mem,
-                                par = par,
-                                java_path = java_path, gatk4_path = gatk4_path)
+                                min_base_quality_score = min_base_quality_score,
+                                minimum_mapping_quality = minimum_mapping_quality,
+                                par = par)
 
   genome_dbs <- run_GenomicsDBImport(hapmap,
                                      bedfiles,
                                      mem = mem,
                                      par = par,
-                                     batch_size = batch_size,
-                                     java_path = java_path, gatk4_path = gatk4_path)
+                                     batch_size = batch_size)
 
   raw_vcfs <- run_GenotypeGVCFs(bedfiles, reference,
+                                new_qual = new_qual,
                                 mem = mem,
-                                par = par,
-                                java_path = java_path, gatk4_path = gatk4_path)
+                                par = par)
 
   vcfs <- run_VariantFiltration(raw_vcfs, reference,
                                 mem = mem,
                                 QD = QD, FS = FS, SOR = SOR, MQ = MQ, MQRankSum = MQRankSum, ReadPosRankSum = ReadPosRankSum,
-                                min_genotype_quality = min_genotype_quality,
-                                java_path = java_path, gatk4_path = gatk4_path)
+                                min_genotype_quality = min_genotype_quality)
 
   # concat if requested
   if(concatenate_final_vcfs & length(vcfs) > 1){

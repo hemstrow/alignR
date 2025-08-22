@@ -4,7 +4,7 @@
 \alias{merge_bams}
 \title{Merge bam files}
 \usage{
-merge_bams(file_list, names = NULL, par = 1, overwrite_RGSM = TRUE)
+merge_bams(file_list, names = NULL, par = 1)
 }
 \arguments{
 \item{file_list}{list where each element contains a set of bam files to

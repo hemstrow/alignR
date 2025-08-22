@@ -10,28 +10,21 @@
 \alias{genotype_bams_GATK}
 \title{Genotype bamfiles with GATK}
 \usage{
-run_HaplotypeCaller(bamfiles, reference, mem, region = "all", par = 1)
+run_HaplotypeCaller(
+  bamfiles,
+  reference,
+  mem,
+  region = "all",
+  min_base_quality_score = 33,
+  minimum_mapping_quality = 20,
+  par = 1
+)
 
 add_RGS(bamfiles, read_metadata, fastqs = NULL, par = 1)
 
-run_GenomicsDBImport(
-  hapmap,
-  bedfiles,
-  mem,
-  par = 1,
-  batch_size = 5,
-  java_path = "java",
-  gatk4_path = "gatk.jar"
-)
+run_GenomicsDBImport(hapmap, bedfiles, mem, par = 1, batch_size = 5)
 
-run_GenotypeGVCFs(
-  bedfiles,
-  reference,
-  mem,
-  par = 1,
-  java_path = "java",
-  gatk4_path = "gatk.jar"
-)
+run_GenotypeGVCFs(bedfiles, reference, mem, new_qual = TRUE, par = 1)
 
 run_VariantFiltration(
   vcfs,
@@ -44,12 +37,10 @@ run_VariantFiltration(
   MQ = 40,
   MQRankSum = -12.5,
   ReadPosRankSum = -8,
-  min_genotype_quality = 13,
-  java_path = "java",
-  gatk4_path = "gatk.jar"
+  min_genotype_quality = 13
 )
 
-prep_genome_GATK(reference, java_path = "java", picard_path = "picard.jar")
+prep_genome_GATK(reference)
 
 genotype_bams_GATK(
   bamfiles,
@@ -66,11 +57,11 @@ genotype_bams_GATK(
   MQRankSum = -12.5,
   ReadPosRankSum = -8,
   min_genotype_quality = 13,
+  new_qual = TRUE,
+  min_base_quality_score = 33,
+  minimum_mapping_quality = 20,
   batch_size = 5,
   add_RGs = TRUE,
-  java_path = "java",
-  gatk4_path = "gatk.jar",
-  picard_path = "picard.jar",
   concatenate_final_vcfs = TRUE
 )
 }
@@ -83,6 +74,12 @@ as by default if produced using \code{\link{align_denovo}} or
 with \code{bwa} and \code{picard} and zipped with \code{samtools bgzip}.
 If running with \code{genotype_bams_GATK}, this will happen
 automatically, if not, consider running \code{prep_genome_GATK}.}
+
+\item{min_base_quality_score}{numeric, default 33. Base quality score cutoff
+for use during haplotype calling.}
+
+\item{minimum_mapping_quality}{Numeric, default 20. Mapping quality score
+cutoff for use during haplotype calling.}
 
 \item{par}{Numeric, default 1. Number of cores to use for parallel processing.}
 
@@ -107,6 +104,9 @@ if \code{add_RGs} is \code{FALSE}.}
 \item{batch_size}{Numeric, default 5. The number of "gvcf" files to import at
 a time during \code{GenomicsDBImport} operation. Higher numbers are faster
 but more memory intense, for the most part.}
+
+\item{new_qual}{logical, default TRUE. If TRUE, uses GATK's new AF model. Set
+FALSE if comparing with old genotyping runs which used the old model.}
 
 \item{QD}{Numeric, default 2. Minimum quality-by-depth score to keep
 variants. See
