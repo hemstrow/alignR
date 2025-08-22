@@ -27,7 +27,10 @@ install_dependencies_conda <- function(name = "alignR"){
 
   if(reticulate::condaenv_exists(name)){
     cat("Designated env already exists. Install dependencies to that env? y/n\n")
-    resp <- readLines()
+    resp <- readLines(n = 1)
+    resp <- tolower(resp)
+    if(resp == "yes") resp <- "y"
+    if(resp == "no") resp <- "n"
     while(resp != "y"){
       resp <- tolower(resp)
       if(resp == "yes") resp <- "y"
@@ -37,7 +40,7 @@ install_dependencies_conda <- function(name = "alignR"){
         stop("Designated env already exists.\n")
       }
       cat("Designated env already exists. Install dependencies to that env? y/n\n")
-      resp <- readLines()
+      resp <- readLines(n = 1)
     }
   }
   else{
