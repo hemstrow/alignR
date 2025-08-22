@@ -52,7 +52,12 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                     trim = NULL,
                                                     align = NULL,
                                                     merge = NULL,
-                                                    downsample = NULL)){
+                                                    downsample = NULL,
+                                                    HaplotypeCaller = NULL,
+                                                    GenomicsDBImport = NULL,
+                                                    GenotypeGVCFs = NULL,
+                                                    VariantFiltration = NULL,
+                                                    conda_env = NULL)){
 
   # rmake needs to know where the script is that generates the makefile; so save a dummy copy of this function alongside called args.
   env <- c(as.list(environment()))
@@ -67,7 +72,9 @@ run_rmake_pipeline <- function(RA, RB = NULL,
 
 
   #=======================sanity checks===========================================
-  slurm_profile_needs <- c("genome_index", "trim", "align", "merge", "downsample", "HaplotypeCaller")
+  slurm_profile_needs <- c("genome_index", "trim", "align", "merge", "downsample", "HaplotypeCaller", 
+                           "GenomicsDBImport", "GenotypeGVCFs", "VariantFiltration",
+                           "conda_env")
   for(i in 1:length(slurm_profile_needs)){
     if(!slurm_profile_needs[i] %in% names(slurm_profile)){
       nl <- list(temp = NULL)
