@@ -40,8 +40,10 @@ install_dependencies_conda <- function(name = "alignR"){
       resp <- readLines()
     }
   }
+  else{
+    reticulate::conda_create(name)
+  }
 
-  reticulate::conda_create(name)
   reticulate::conda_install(name, c("r-base", "perl"))
   reticulate::conda_install(name, c("bwa",
                                     "vcftools",
