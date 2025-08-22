@@ -25,6 +25,22 @@ install_dependencies_conda <- function(name = "alignR"){
   #   stop("Conda install not detected.\n")
   # }
 
+  if(reticulate::condaenv_exists(name)){
+    cat("Designated env already exists. Install dependencies to that env? y/n\n")
+    resp <- readLines()
+    while(resp != "y"){
+      resp <- tolower(resp)
+      if(resp == "yes") resp <- "y"
+      if(resp == "no") resp <- "n"
+
+      if(resp == "n"){
+        stop("Designated env already exists.\n")
+      }
+      cat("Designated env already exists. Install dependencies to that env? y/n\n")
+      resp <- readLines()
+    }
+  }
+
   reticulate::conda_create(name)
   reticulate::conda_install(name, c("r-base", "perl"))
   reticulate::conda_install(name, c("bwa",
