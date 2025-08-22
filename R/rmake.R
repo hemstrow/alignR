@@ -56,8 +56,8 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                     HaplotypeCaller = NULL,
                                                     GenomicsDBImport = NULL,
                                                     GenotypeGVCFs = NULL,
-                                                    VariantFiltration = NULL,
-                                                    conda_env = NULL)){
+                                                    VariantFiltration = NULL),
+                               slurm_system_append = NULL){
 
   # rmake needs to know where the script is that generates the makefile; so save a dummy copy of this function alongside called args.
   env <- c(as.list(environment()))
@@ -72,9 +72,8 @@ run_rmake_pipeline <- function(RA, RB = NULL,
 
 
   #=======================sanity checks===========================================
-  slurm_profile_needs <- c("genome_index", "trim", "align", "merge", "downsample", "HaplotypeCaller", 
-                           "GenomicsDBImport", "GenotypeGVCFs", "VariantFiltration",
-                           "conda_env")
+  slurm_profile_needs <- c("genome_index", "trim", "align", "merge", "downsample", "HaplotypeCaller",
+                           "GenomicsDBImport", "GenotypeGVCFs", "VariantFiltration")
   for(i in 1:length(slurm_profile_needs)){
     if(!slurm_profile_needs[i] %in% names(slurm_profile)){
       nl <- list(temp = NULL)
@@ -144,6 +143,7 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   #                These may be updated following merging
   #            RA (and RB at the start) will hold current output file names, including extensions.
 
+  browser()
   # prep genome
   ref_bn <- gsub("\\.gz$", "", reference)
   ref_bn <- rmake::replaceSuffix(ref_bn, "")
@@ -158,9 +158,14 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                         paste0(ref_bn, ".dict")),
                              script = gprep_script,
                              depends = reference,
-                             params = c(list(), slurm_profile$genome_index))
+                             params = c(slurm_profile = slurm_profile$genome_index,
+                                        list(slurm_ssa = slurm_system_append)))
 
-
+  if(until == "gprep"){
+    rmake::makefile(c(list(gprep_rule)),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
+  }
 
   # trimming
   trim_script <- .fetch_a_script("trim.R", "rmake")
@@ -168,18 +173,25 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   trim_rule <- rmake::rRule(target = c("$[RA]_trimmed.fastq", "$[RB]_trimmed.fastq"),
                             script = trim_script,
                             depends = c("$[RA].fastq", "$[RB].fastq"),
-                            params = .fill_args_defaults(c(c(fastp_args,
-                                                             slurm_profile$trim)),
-                                                         func = trim_fastp,
-                                                         skip = c("RA_fastqs", "RB_fastqs")))
+                            params = c(.fill_args_defaults(fastp_args,
+                                                           func = trim_fastp,
+                                                           skip = c("RA_fastqs", "RB_fastqs")),
+                                       list(slurm_ssa = slurm_system_append,
+                                            slurm_profile = slurm_profile$trim)))
 
   trim_rule <- rmake::expandTemplate(trim_rule, data.frame(RA = sample_names,
                                                            RB = sample_namesB))
   RA <- rmake::replaceSuffix(RA, "_trimmed.fastq")
   RB <- rmake::replaceSuffix(RB, "_trimmed.fastq")
 
+  if(until == "trim"){
+    rmake::makefile(c(list(gprep_rule), trim_rule),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
+  }
+
+
   # align
-  browser()
   align_script <- .fetch_a_script("align.R", "rmake")
 
   align_rule <- rmake::rRule(target = c("$[out].sort.flt.bam",
@@ -194,16 +206,26 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                                           ".ann",
                                                                           ".bwt",
                                                                           ".pac"))),
-                        params = .fill_args_defaults(c(list(reference = reference,
+                        params = c(.fill_args_defaults(c(list(reference = reference,
                                                             read_metadata = cbind(sn = RA, read_metadata)),
-                                                       c(align_args,
-                                                         slurm_profile$align)),
+                                                       align_args),
                                                      func = align_reference,
-                                                     skip = c("RA_fastqs", "RB_fastqs")))
+                                                     skip = c("RA_fastqs", "RB_fastqs")),
+                                   list(slurm_ssa = slurm_system_append,
+                                        slurm_profile = slurm_profile$align)))
+
   align_rule <- rmake::expandTemplate(align_rule, data.frame(out = sample_names,
                                                              RA = RA,
                                                              RB = RB))
   RA <- paste0(sample_names, ".sort.flt.bam")
+
+  if(until == "align"){
+    rmake::makefile(c(list(gprep_rule), trim_rule, align_rule),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
+  }
+
+
 
   # merge anything that needs merging
   if(is.list(merge_list)){
@@ -227,9 +249,11 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                       script = merge_script,
                                       depends = c(paste0(tsamps, ".sort.flt.bam"),
                                                   paste0(tsamps, ".sort.flt.bam.bai")),
-                                      params = .fill_args_defaults(args = c(list(file_list = tml),
-                                                                            slurm_profile$merge),
-                                                                   func = merge_bams))
+                                      params = c(.fill_args_defaults(args = list(file_list = tml),
+                                                                   func = merge_bams),
+                                                 list(slurm_ssa = slurm_system_append,
+                                                      slurm_profile = slurm_profile$merge))
+                                      )
     }
 
     # update names
@@ -242,6 +266,12 @@ run_rmake_pipeline <- function(RA, RB = NULL,
     merge_rule <- NULL
   }
 
+  if(until == "merge"){
+    rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
+  }
+
   # downsample
   if(downsample_args$low_cut > 0 | downsample_args$high_cut < Inf){
     downsample_script <- .fetch_a_script("downsample.R", "rmake")
@@ -249,11 +279,13 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                "$[samples].sub.bam.bai"),
                                     script = downsample_script,
                                     depends = c("$[RA]", "$[RA].bai"),
-                                    params = .fill_args_defaults(c(list(reference = reference),
-                                                                   c(downsample_args,
-                                                                     slurm_profile$downsample)),
+                                    params = c(.fill_args_defaults(c(list(reference = reference),
+                                                                   downsample_args),
                                                                  func = downsample_bams,
-                                                                 skip = "bams"))
+                                                                 skip = "bams"),
+                                               list(slurm_ssa = slurm_system_append,
+                                                    slurm_profile = slurm_profile$downsample))
+                                    )
     downsample_rule <- rmake::expandTemplate(downsample_rule, data.frame(RA = RA,
                                                                          samples = sample_names))
 
@@ -261,6 +293,12 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   }
   else{
     downsample_rule <- NULL
+  }
+
+  if(until == "downsample"){
+    rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule, downsample_rule),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
   }
 
   # the next few steps are scattered
@@ -276,15 +314,24 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                           depends = c("$[RA]", file.path(dirname(RA[1]), "$[rf].list"), "$[RA].bai",
                                       reference,
                                       paste0(ref_bn, ".dict")),
-                          params = .fill_args_defaults(c(list(reference = reference),
-                                                         slurm_profile$HaplotypeCaller,
+                          params = c(.fill_args_defaults(c(list(reference = reference),
                                                          HaplotypeCaller_args),
                                                        func = run_HaplotypeCaller,
-                                                       skip = c("bamfiles", "region")))
+                                                       skip = c("bamfiles", "region")),
+                                     list(slurm_ssa = slurm_system_append,
+                                          slurm_profile = slurm_profile$HaplotypeCaller))
+                          )
 
   HC_fill_df <- merge(data.frame(sg = sample_names, RA = RA),
                             data.frame(rf = scatter_groups))
   HC_rule <- rmake::expandTemplate(HC_rule, vars = HC_fill_df)
+
+  if(until == "haplotypecaller"){
+    rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule, downsample_rule,
+                      HC_rule),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
+  }
 
   # CenomicsDBImport
   # this runs on each scaffold group/chromosome.
@@ -304,8 +351,9 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                     reference,
                                                     paste0(ref_bn, ".dict")),
                                         params = c(list(reference = reference, L = uchroms[i]),
-                                                   slurm_profile$GenomicsDBImport,
-                                                   GenomicsDBImport_args)))
+                                                   GenomicsDBImport_args,
+                                                   list(slurm_ssa = slurm_system_append,
+                                                        slurm_profile = slurm_profile$GenomicsDBImport))))
       gdbis <- c(gdbis, rmake::targets(GDBI_rule[[i]]))
     }
   }
@@ -322,11 +370,20 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                   params = c(list(reference = reference,
                                                                   L = file.path(dirname(RA[1]),
                                                                                 paste0(scatter_groups, ".list"))),
-                                                             slurm_profile$GenomicsDBImport,
-                                                             GenomicsDBImport_args))))
+                                                             GenomicsDBImport_args,
+                                                             list(slurm_ssa = slurm_system_append,
+                                                                  slurm_profile = slurm_profile$GenomicsDBImport,)))))
 
       gdbis <- c(gdbis, rmake::targets(GDBI_rule[[length(GDBI_rule)]]))
     }
+  }
+
+
+  if(until == "genomicsdbimport"){
+    rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule, downsample_rule,
+                      HC_rule, GDBI_rule),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
   }
 
   # GenotypeGVCFs
@@ -340,8 +397,9 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                 file.path(dirname(RA[1]), "$[chrom]_db"),
                                                 reference,
                                                 paste0(ref_bn, ".dict")),
-                                    params = c(slurm_profile$GenotypeGVCFs,
-                                               GenotypeGVCFs_args))
+                                    params = c(GenotypeGVCFs_args,
+                                               list(slurm_ssa = slurm_system_append,
+                                                    slurm_profile = slurm_profile$GenotypeGVCFs)))
 
     genotype_rule <- c(genotype_rule, rmake::expandTemplate(chrom_geno_rule, vars = as.data.frame(scatter_info[type == "chrom", .(scatter_idx, chrom)])))
   }
@@ -352,15 +410,22 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                                 file.path(dirname(RA[1]), "$[scatter_idx]_db"),
                                                 reference,
                                                 paste0(ref_bn, ".dict")),
-                                    params = c(slurm_profile$GenotypeGVCFs,
-                                               GenotypeGVCFs_args))
+                                    params = c(GenotypeGVCFs_args,
+                                               list(slurm_ssa = slurm_system_append,
+                                                    slurm_profile = slurm_profile$GenotypeGVCFs)))
 
     genotype_rule <- c(genotype_rule, rmake::expandTemplate(scat_geno_rule, vars = as.data.frame(scatter_info[type == "scaff",]$scatter_idx)))
   }
 
+  if(until == "genotype"){
+    rmake::makefile(c(list(gprep_rule), trim_rule, align_rule, merge_rule, downsample_rule,
+                      HC_rule, GDBI_rule, genotype_rule),
+                    fileName = "Makefile", makeScript = "Makefile.R")
+    rmake::make()
+  }
+
   # Variant Filtration
   ## we can use the pre-existing function here, no problems
-  browser()
   VF_script <- .fetch_a_script("VariantFiltration.R", "rmake")
 
   VF_rule <- rmake::rRule(target = c("$[scat]_hard_filt_pass.recode.vcf"),
@@ -368,10 +433,12 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                           depends = c("$[scat].vcf.gz",
                                       reference,
                                       paste0(ref_bn, ".dict")),
-                          params = .fill_args_defaults(c(slurm_profile$VariantFiltration,
-                                                         VariantFiltration_args),
-                                                       func = run_VariantFiltration,
-                                                       skip = c("vcfs", "reference")))
+                          params = c(.fill_args_defaults(VariantFiltration_args,
+                                                         func = run_VariantFiltration,
+                                                         skip = c("vcfs", "reference")),
+                                     list(slurm_ssa = slurm_system_append,
+                                          slurm_profile = slurm_profile$VariantFiltration)
+                          ))
   VF_rule <- rmake::expandTemplate(VF_rule, vars = data.frame(scat = file.path(dirname(RA[1]), scatter_groups)))
 
 
@@ -413,11 +480,11 @@ run_rmake_pipeline <- function(RA, RB = NULL,
 
 # calling function that runs a function provided with args, some of which might be slurm args.
 # this should run within the rule scripts sourced by rmake::rRule()
-.rule_caller_w_slurm <- function(func, params, jobname = NULL){
+.rule_caller_w_slurm <- function(func, params, jobname = NA, randomize_JN = TRUE){
   # grab sets of params
-  slurm_params <- params[grep("^slurm_", params)]
+  slurm_params <- params[grep("^slurm_", names(params))]
   if(length(slurm_params) > 0){
-    params <- params[-grep("^slurm_", params)]
+    params <- params[-grep("^slurm_", names(params))]
   }
 
   if(length(slurm_params) == 0){
@@ -427,11 +494,71 @@ run_rmake_pipeline <- function(RA, RB = NULL,
 
   # call with rslurm
   else{
+    names(slurm_params) <- gsub("^slurm_", "", names(slurm_params))
     params <- params[which(names(params) %in% names(formals(func)))]
-    rslurm::slurm_call(func, params = params, jobname = jobname, slurm_options = slurm_params)
+
+    # handle options
+    if("profile" %in% names(slurm_params)){
+      slurm_options <- vector("list", length(slurm_params$profile))
+      for(i in 1:length(slurm_options)){
+        if(grepl("^--", slurm_params$profile[i])){
+          topt <- strsplit(slurm_params$profile[[i]], "=")[[1]]
+          names(slurm_options)[i] <- gsub("--", "", topt[1])
+          slurm_options[[i]] <- topt[2]
+        }
+        else{
+          stop("Unaccepted slurm option header: ", slurm_params$profile[[i]], "\nHeaders must be --, as in --time. Short forms (-t) are not allowed.\n")
+        }
+      }
+    }
+    else{
+      slurm_options <- list()
+    }
+
+    # fix jobnames
+    if(randomize_JN){
+      jobname <- paste0(jobname, "ID", .rand_strings(1, 8))
+    }
+
+    # handle ssa -- messy as hell, need to execute the lines handed to slurm_ssa first.
+    # done by making a new function
+    # @param execute_func function, the core function to execute
+    # @param cparams nested, named list. Names are: \itemize{
+    #  \item{func_params: }{named list, the arguments to execute_func}
+    #  \item{ssa: }{a vector of ssa commands to run before execute_func}
+    # the cparams$ssa commands are each system()'d, then do.call is used to
+    # execute  execute_func with cparams$func_params.
+    if("ssa" %in% names(slurm_params)){
+      new_func <- function(execute_func, cparams){
+
+        for(i in 1:length(cparams$ssa)){
+          system(cparams$ssa[i])
+        }
+        print(str(cparams$func_params))
+
+        do.call(execute_func, args = cparams$func_params)
+      }
+
+      new_params <- list(execute_func = func, cparams = list(func_params = params, ssa = slurm_params$ssa))
+
+      # execute
+      rslurm::slurm_call(new_func, params = new_params, jobname = jobname, slurm_options = slurm_options)
+    }
+    else{
+      # execute
+      rslurm::slurm_call(func, params = params, jobname = jobname, slurm_options = slurm_options)
+    }
   }
 }
 
 .console_hline <- function(char = "="){
   return(paste0(rep(char, getOption("width")), collapse = ""))
+}
+
+.rand_strings <- function(n, length){
+  chrs <- sample(c(LETTERS, letters, 1:9), n*length, replace = TRUE)
+  chrs <- split(chrs, rep(1:n, length.out = n*length))
+  chrs <- unlist(lapply(chrs, function(x) paste0(x, collapse = "")))
+  chrs <- as.character(chrs)
+  return(chrs)
 }
