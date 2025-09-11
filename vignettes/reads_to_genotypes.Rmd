@@ -1,0 +1,61 @@
+---
+title: "Reads to Genotypes with alignR"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{reads_to_genotypes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(alignR)
+```
+
+# Overview
+
+Calling genotypes with `alignR` is designed to be as painless and straightforward as possible. In essence, there are three steps needed to go from raw, fresh off the sequencer reads to called genotypes, one of which may not be needed depending on what kind of data you are starting with.
+
+1. Demultiplexing: Taking a `.fastq` or `.fq` file or files containing data for many individual samples, each of which have unique barcodes, and splitting it/them up into a file or files for each sample. You may have barcodes encoded in the header of the fastq file(s), in a seperate fastq file, or at the start of each read (or some combination of those), and you may therefore have one, two, or three fastq files (one for forward reads, one for reverse reads if you have paired-end sequencing data, and one for barcodes if those are stored in a seperate file). You may also have reads that have already been split up by sample depending on where you sequenced your data.
+
+2. Aligning: Reads typically then need to be either aligned to a reference genome or to each-other (a "de-novo" reference). `alignR` does this either with the Burrows-Wheeler aligner via `bwa` or via STACKS, respectively. This produces `.bam` files containing sequencing data, quality scores, and alignment information.
+
+3. Genotyping: Aligned `.bam` files can then be genotyped. `alignR` offers three different alignment approaches: GATK, which is suitable for high-coverage reduced-representation or whole-genome data, ANGSD, which is suitable for low-coverage reduced-representation or whole-genome data, and STACKS, which is suitable for high(ish) coverage, reduced-representation data. Each of these have several filtering and processing options.
+
+`alignR` is built on the idea that each of these steps should take at most one function call to execute, with all of the sub-functions and options baked in.
+
+# What if I don't like command line?
+
+First and foremost, `alignR` offers a Graphical User Interface (GUI) containing the full suite of demultiplexing, alignment, and genotyping tools built into the package. It can be called with `alignR_gui()`, and should be quite straightforward to use. Note, however, that it isn't really scriptable, so those with large datasets that benefit from very high parallelization and/or high-performace computing clusters will probably want to use `alignR`'s functions directly instead.
+
+# Example:
+
+`alignR` contains some example data that we can use to run through a fastq-to-genotype pipeline. We'll need to locate four files: the forward-read, barcode, and reverse read `.fastq` files and a reference genome. For reference, this data comes from [this study](https://doi.org/10.1111/mec.16592) of monarch butterflies.
+
+## Demultiplexing
+
+Demultiplexing is achieved via the `demultiplex()` function, and takes a few arguments:
+
+* R1: a vector of paths to the forward read fastq files.
+
+* R2: a vector of paths to read fastq files containing barcodes.
+
+* R3: a vector of paths to the reverse read fastq files.
+
+* barcodes: a vector of barcodes located either at the start of reads or in fastq headers.
+
+* indices: a vector of barcodes located in the R2 (barcode) reads.
+
+* barcode_locations: Either "read_start", "header", and/or "R2" indicating barcode locations. Both "R2" and either "header" or "read_start" can be used together if your data is dual-barcoded.
+
+* sample_names: an entirely optional data.frame linking barcodes/indices to sample names. If provided, outfiles will be renamed with sample IDs.
+
+and a few other technical arguments that are less frequently used (see documentation by typing "?demultiplex" into the console).
+
+

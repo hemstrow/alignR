@@ -858,7 +858,7 @@ genotype_bams_GATK <- function(bamfiles, reference, read_metadata = NULL, fastqs
 
   #==========setup==========
   # check ref
-  reference <- prep_genome_GATK(reference, java_path, picard_path, slurm_args_index = slurm_args_index)
+  reference <- prep_genome_GATK(reference)
 
   # add RGs
   if(add_RGs){
