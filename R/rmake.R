@@ -143,7 +143,6 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   #                These may be updated following merging
   #            RA (and RB at the start) will hold current output file names, including extensions.
 
-  browser()
   # prep genome
   ref_bn <- gsub("\\.gz$", "", reference)
   ref_bn <- rmake::replaceSuffix(ref_bn, "")
@@ -520,33 +519,48 @@ run_rmake_pipeline <- function(RA, RB = NULL,
       jobname <- paste0(jobname, "ID", .rand_strings(1, 8))
     }
 
-    # handle ssa -- messy as hell, need to execute the lines handed to slurm_ssa first.
+    # handle ssa and dir change -- messy as hell, need to execute the lines handed to slurm_ssa first.
     # done by making a new function
     # @param execute_func function, the core function to execute
     # @param cparams nested, named list. Names are: \itemize{
     #  \item{func_params: }{named list, the arguments to execute_func}
     #  \item{ssa: }{a vector of ssa commands to run before execute_func}
+    # @param wd path to directory in which to do work. Needed because rslurm makes a new directory for submission scripts, etc, and executes there by default.
     # the cparams$ssa commands are each system()'d, then do.call is used to
     # execute  execute_func with cparams$func_params.
+    owd <- getwd()
     if("ssa" %in% names(slurm_params)){
-      new_func <- function(execute_func, cparams){
+      new_func <- function(execute_func, cparams, wd){
 
         for(i in 1:length(cparams$ssa)){
           system(cparams$ssa[i])
         }
+        
+        setwd(wd)
         print(str(cparams$func_params))
 
         do.call(execute_func, args = cparams$func_params)
       }
 
-      new_params <- list(execute_func = func, cparams = list(func_params = params, ssa = slurm_params$ssa))
+      new_params <- list(execute_func = func, cparams = list(func_params = params, ssa = slurm_params$ssa),
+                         wd = owd)
 
       # execute
       rslurm::slurm_call(new_func, params = new_params, jobname = jobname, slurm_options = slurm_options)
     }
     else{
+      new_func <- function(execute_func, cparams, wd){
+        setwd(wd)
+        print(str(cparams$func_params))
+        
+        do.call(execute_func, args = cparams$func_params)
+      }
+      
+      new_params <- list(execute_func = func, cparams = list(func_params = params),
+                         wd = owd)
+      
       # execute
-      rslurm::slurm_call(func, params = params, jobname = jobname, slurm_options = slurm_options)
+      rslurm::slurm_call(new_func, params = new_params, jobname = jobname, slurm_options = slurm_options)
     }
   }
 }
