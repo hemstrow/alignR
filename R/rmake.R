@@ -28,6 +28,7 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                                max_chunk_size,
                                merge_list = NULL,
                                until = NULL,
+                               simultanious_jobs = 1,
                                downsample_args = list(low_cut = 0, high_cut = Inf),
                                fastp_args = list(adapter_r1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
                                                  adapter_r2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
@@ -478,7 +479,7 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                     HC_rule, GDBI_rule, genotype_rule, VF_rule),
                   fileName = "Makefile", makeScript = "Makefile.R")
   if(!is.null(until)){
-    rmake::make(until)
+    rmake::make(paste0(until, " -j", simultanious_jobs))
   }
   else{
     rmake::make()
@@ -596,7 +597,8 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                          wd = owd)
 
       # execute
-      rslurm::slurm_call(new_func, params = new_params, jobname = jobname, slurm_options = slurm_options)
+      job <- rslurm::slurm_call(new_func, params = new_params, jobname = jobname, slurm_options = slurm_options)
+      .job_monitor(job, 5)
     }
     else{
       new_func <- function(execute_func, cparams, wd){
@@ -610,7 +612,8 @@ run_rmake_pipeline <- function(RA, RB = NULL,
                          wd = owd)
       
       # execute
-      rslurm::slurm_call(new_func, params = new_params, jobname = jobname, slurm_options = slurm_options)
+      job <- rslurm::slurm_call(new_func, params = new_params, jobname = jobname, slurm_options = slurm_options)
+      .job_monitor(job, 5)
     }
   }
 }
@@ -625,4 +628,10 @@ run_rmake_pipeline <- function(RA, RB = NULL,
   chrs <- unlist(lapply(chrs, function(x) paste0(x, collapse = "")))
   chrs <- as.character(chrs)
   return(chrs)
+}
+
+.job_monitor <- function(job, time){
+  while(!job$completed){
+    Sys.sleep(time = time) #Time in seconds
+  }
 }
