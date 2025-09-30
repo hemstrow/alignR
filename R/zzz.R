@@ -171,7 +171,7 @@
   # try gatk4
   gatk4_check <- suppressWarnings(system("gatk --version", ignore.stdout = TRUE, ignore.stderr = TRUE))
   if(gatk4_check == 127){
-    Sys.setenv(fastp_install = FALSE)
+    Sys.setenv(gatk4_install = FALSE)
     packageStartupMessage(paste0("No gatk4 installation detected! Some functions will fail:\n\t",
                                  paste0(unlist(.dependency_function_match("gatk")), collapse = "\n\t"),
                                  "\n"))

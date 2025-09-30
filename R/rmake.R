@@ -7,11 +7,12 @@
 #' 
 #' @param read_metadata a data.frame or equivalent with a row for each \code{RA}
 #'   read file and a columns, in order, indicating:
-#'   * library
-#'   * sampleID/name
-#'   * sequencing platform
-#'   * flowcell
-#'   * sequencing lane
+#'   
+#'   1. library
+#'   2. sampleID/name
+#'   3. sequencing platform
+#'   4. flowcell
+#'   5. sequencing lane
 #'   
 #'   Column names are optional but recommended for organizational purposes.
 #'   The 'flowcell' and 'sequencing lane' columns can be left as NA,
@@ -496,7 +497,15 @@ run_rmake_pipeline <- function(RA, RB = NULL,
     params <- params[-grep("^slurm_", names(params))]
   }
 
-  if(length(slurm_params) == 0){
+  print(slurm_params)
+  do_slurm <- FALSE
+  if(any(names(slurm_params) == "slurm_profile")){
+    if(!is.null(slurm_params$slurm_profile)){
+      do_slurm <- TRUE
+    }
+  }
+  
+  if(!do_slurm){
     params <- params[which(names(params) %in% names(formals(func)))]
     do.call(func, args = params)
   }
@@ -539,7 +548,13 @@ run_rmake_pipeline <- function(RA, RB = NULL,
     # the cparams$ssa commands are each system()'d, then do.call is used to
     # execute  execute_func with cparams$func_params.
     owd <- getwd()
+    do_ssa <- FALSE
     if("ssa" %in% names(slurm_params)){
+      if(!is.null(slurm_params$ssa)){
+        do_ssa <- TRUE
+      }
+    }
+    if(do_ssa){
       new_func <- function(execute_func, cparams, wd){
 
         for(i in 1:length(cparams$ssa)){
