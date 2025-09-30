@@ -829,9 +829,7 @@ align_denovo <- function(RA_fastqs, RB_fastqs = NULL, M,
                                     par = par,
                                     mapQ = mapQ,
                                     remove_duplicates = remove_duplicates,
-                                    remove_improper_pairs = remove_improper_pairs,
-                                    slurm_args_index = slurm_args_index,
-                                    slurm_args_realign = slurm_args_realign)
+                                    remove_improper_pairs = remove_improper_pairs)
   }
 
   else{

@@ -631,7 +631,9 @@ run_rmake_pipeline <- function(RA, RB = NULL,
 }
 
 .job_monitor <- function(job, time){
-  while(!job$completed){
+  job_status <- rslurm::get_job_status(job)
+  while(!job_status$completed){
     Sys.sleep(time = time) #Time in seconds
+    job_status <- rslurm::get_job_status(job)
   }
 }
