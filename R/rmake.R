@@ -1,15 +1,25 @@
+#' Run a complete GATK reads-to-genomes pipeline with rmake.
+#' 
+#' Runs a reference-guided pipeline to go from demultiplexed reads to a vcf
+#' file with called variants, including filtering. Optionally works with a slurm
+#' system to queue jobs.
+#' 
+#' 
 #' @param read_metadata a data.frame or equivalent with a row for each \code{RA}
-#'   read file and a columns, in order, indicating \itemize{
-#'   \item{library}
-#'   \item{sampleID/name}
-#'   \item{sequencing platform}
-#'   \item{flowcell}
-#'   \item{sequencing lane}}
+#'   read file and a columns, in order, indicating:
+#'   * library
+#'   * sampleID/name
+#'   * sequencing platform
+#'   * flowcell
+#'   * sequencing lane
+#'   
 #'   Column names are optional but recommended for organizational purposes.
 #'   The 'flowcell' and 'sequencing lane' columns can be left as NA,
 #'   in which case they will be guessed from the fastq header. This may create
 #'   errors if fastq headers are non-standard (flow cell and lane are expected
 #'   in the third and fourth slots, respectively (separated by ':')).
+#'   
+#' @export
 run_rmake_pipeline <- function(RA, RB = NULL,
                                read_metadata,
                                reference,

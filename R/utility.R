@@ -658,3 +658,27 @@ prep_scatter_intervals <- function(reference,
   return(chrom_and_sg)
 }
 
+#' Locate the example reads and reference
+#' 
+#' Fetch a named list pointing to the RA, RB, and reference genome example 
+#' files.
+#' 
+#' @export
+#' 
+#' @examples
+#' # fetch the example data paths
+#' example_data <- locate_example_data()
+#' example_data$RA
+#' example_data$RB
+#' example_data$reference
+#' 
+locate_example_data <- function(){
+  edir <- system.file("exdata", package = "alignR")
+  files <- list.files(edir, full.names = TRUE)
+  RA <- files[grep("R1\\.fastq$", files)]
+  RB <- files[grep("R2\\.fastq$", files)]
+  ref <- files[grep("monarch", files)]
+  
+  return(list(RA = RA, RB = RB, reference = ref))
+}
+
